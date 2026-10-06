@@ -3,7 +3,8 @@
 // Dashboard is now implemented; the other two remain placeholders for your partner.
 // "history" is a Should-Have screen (Session History).
 // "settings" is a Should-Have screen (Settings & Preferences).
-export type Screen = "dashboard" | "builder" | "studytypes" | "sync" | "community" | "reflect" | "history" | "settings";
+// "timer" is a Should-Have screen (Study Timer / Pomodoro).
+export type Screen = "dashboard" | "builder" | "studytypes" | "sync" | "community" | "reflect" | "history" | "settings" | "timer";
 
 export interface NavEntry {
   screen: Screen;
@@ -18,6 +19,21 @@ export interface StudyFlowTemplate {
   tag: string;
   rating: number;
   usedBy: number;
+}
+
+export interface StudyFlow {
+  id: string;
+  title: string;
+  tag: string;
+  blocks: StudyBlock[];
+  totalMinutes: number;
+}
+
+export interface StudyBlock {
+  id: string;
+  title: string;
+  type: "focus" | "break" | "review" | "recall";
+  durationMinutes: number;
 }
 
 export interface SyncPreferences {
