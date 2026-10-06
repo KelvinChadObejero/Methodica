@@ -2,7 +2,8 @@
 // The first three (dashboard, builder, studytypes) are Must-Have screens.
 // Dashboard is now implemented; the other two remain placeholders for your partner.
 // "history" is a Should-Have screen (Session History).
-export type Screen = "dashboard" | "builder" | "studytypes" | "sync" | "community" | "reflect" | "history";
+// "settings" is a Should-Have screen (Settings & Preferences).
+export type Screen = "dashboard" | "builder" | "studytypes" | "sync" | "community" | "reflect" | "history" | "settings";
 
 export interface NavEntry {
   screen: Screen;
@@ -42,4 +43,15 @@ export interface SessionLog {
   subject: string;
   hasReflection: boolean;
   reflection?: ReflectionEntry;
+}
+
+export interface SettingsPreferences {
+  theme: "system" | "light" | "dark";
+  notifications: boolean;
+  sessionReminders: boolean;
+  weeklyReport: boolean;
+  autoStartBreaks: boolean;
+  breakDuration: number; // minutes
+  sessionDuration: number; // minutes
+  dataExportFormat: "json" | "csv";
 }

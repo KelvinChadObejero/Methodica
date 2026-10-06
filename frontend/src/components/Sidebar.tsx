@@ -11,6 +11,7 @@ const SHOULD_HAVE_ITEMS: NavEntry[] = [
   { screen: "community", label: "Community Hub", enabled: true },
   { screen: "reflect", label: "Reflection", enabled: true },
   { screen: "history", label: "Session History", enabled: true },
+  { screen: "settings", label: "Settings", enabled: true },
 ];
 
 interface SidebarProps {

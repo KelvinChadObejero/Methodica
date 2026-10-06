@@ -5,6 +5,7 @@ import SyncSettings from "./screens/SyncSettings";
 import CommunityHub from "./screens/CommunityHub";
 import Reflection from "./screens/Reflection";
 import SessionHistory from "./screens/SessionHistory";
+import Settings from "./screens/Settings";
 import type { Screen } from "./types";
 
 export default function App() {
@@ -22,6 +23,7 @@ export default function App() {
         {screen === "community" && <CommunityHub />}
         {screen === "reflect" && <Reflection />}
         {screen === "history" && <SessionHistory />}
+        {screen === "settings" && <Settings />}
       </main>
     </>
   );
