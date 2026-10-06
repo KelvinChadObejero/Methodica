@@ -23,7 +23,13 @@ app.get("/health", (_req, res) => {
   res.json({ status: "ok", service: "methodica-backend" });
 });
 
-const PORT = process.env.PORT ? Number(process.env.PORT) : 4000;
-app.listen(PORT, () => {
-  console.log(`methodica-backend listening on http://localhost:${PORT}`);
-});
+// Vercel expects the Express app to be exported, not listened on.
+// For local dev, we still listen on a port.
+if (process.env.NODE_ENV !== "production") {
+  const PORT = process.env.PORT ? Number(process.env.PORT) : 4000;
+  app.listen(PORT, () => {
+    console.log(`methodica-backend listening on http://localhost:${PORT}`);
+  });
+}
+
+export default app;
