@@ -1,7 +1,7 @@
 import type { NavEntry, Screen } from "../types";
 
 const CORE_ITEMS: NavEntry[] = [
-  { screen: "dashboard", label: "Dashboard", enabled: false },
+  { screen: "dashboard", label: "Dashboard", enabled: true },
   { screen: "builder", label: "Flow Builder", enabled: false },
   { screen: "studytypes", label: "StudyTypes", enabled: false },
 ];
@@ -10,6 +10,7 @@ const SHOULD_HAVE_ITEMS: NavEntry[] = [
   { screen: "sync", label: "Sync Settings", enabled: true },
   { screen: "community", label: "Community Hub", enabled: true },
   { screen: "reflect", label: "Reflection", enabled: true },
+  { screen: "history", label: "Session History", enabled: true },
 ];
 
 interface SidebarProps {
