@@ -1,81 +1,55 @@
-import { useState } from "react";
-import type { SyncPreferences } from "../types";
-
-function Switch({ on, onToggle }: { on: boolean; onToggle: () => void }) {
-  return (
-    <button
-      className={`switch${on ? " on" : ""}`}
-      role="switch"
-      aria-checked={on}
-      onClick={onToggle}
-    />
-  );
-}
+import { useWorkspace } from "../lib/useWorkspace";
 
 export default function SyncSettings() {
-  const [prefs, setPrefs] = useState<SyncPreferences>({
-    autoSyncWifi: true,
-    autoSyncCellular: false,
-    backgroundSync: true,
-  });
-  const [syncing, setSyncing] = useState(false);
-  const [lastSynced, setLastSynced] = useState("just now");
-
-  function toggle(key: keyof SyncPreferences) {
-    setPrefs((prev) => ({ ...prev, [key]: !prev[key] }));
-  }
-
-  function handleSyncNow() {
-    setSyncing(true);
-    // Placeholder for the real API call your team will wire up later.
-    setTimeout(() => {
-      setSyncing(false);
-      setLastSynced("just now");
-    }, 700);
-  }
-
+  const { data, loading, error, refreshedAt, reload } = useWorkspace();
   return (
     <section className="screen">
-      <div className="eyebrow">Should-Have &middot; 01</div>
-      <h1 className="page-title">Cross-platform sync</h1>
-      <p className="page-sub">
-        Keep the web and mobile app in step, so a flow you build here is ready to run the moment you
-        pick up your phone.
-      </p>
-
+      <div className="eyebrow">YOUR WORKSPACE CONNECTION</div>
+      <h1 className="page-title">Keep your progress close.</h1>
+      <p className="page-sub">Reload flows, sessions, and templates saved by this local API.</p>
       <div className="card sync-status">
-        <div className="sync-icon">&#10003;</div>
-        <div className="info">
-          <b>Up to date</b>
-          <p>Last synced {lastSynced} &middot; Web &harr; Mobile</p>
+        <div className="sync-icon" aria-hidden="true">
+          ↻
         </div>
-        <button className="btn" disabled={syncing} onClick={handleSyncNow}>
-          {syncing ? "Syncing..." : "Sync now"}
+        <div className="info">
+          <b>
+            {loading
+              ? "Connecting…"
+              : error
+                ? "Connection needs attention"
+                : data
+                  ? "Connected to local API"
+                  : "Not connected"}
+          </b>
+          <p>
+            {refreshedAt
+              ? `Last loaded ${refreshedAt.toLocaleTimeString()}`
+              : "No workspace loaded yet"}
+          </p>
+        </div>
+        <button
+          className="btn"
+          disabled={loading}
+          onClick={() =>
+            void reload().catch(() => {
+              /* The global banner shows the error. */
+            })
+          }
+        >
+          {loading ? "Loading…" : "Reload workspace"}
         </button>
       </div>
-
-      <div className="card">
-        <div className="row">
-          <div className="label">
-            Auto-sync on Wi-Fi
-            <span>Sync changes automatically while connected to Wi-Fi</span>
-          </div>
-          <Switch on={prefs.autoSyncWifi} onToggle={() => toggle("autoSyncWifi")} />
-        </div>
-        <div className="row">
-          <div className="label">
-            Auto-sync on cellular
-            <span>Uses mobile data to keep sessions current away from Wi-Fi</span>
-          </div>
-          <Switch on={prefs.autoSyncCellular} onToggle={() => toggle("autoSyncCellular")} />
-        </div>
-        <div className="row">
-          <div className="label">
-            Background sync
-            <span>Sync while the app isn&apos;t open</span>
-          </div>
-          <Switch on={prefs.backgroundSync} onToggle={() => toggle("backgroundSync")} />
-        </div>
+      <div className="card editor-panel">
+        <h2>Cross-device sync is planned.</h2>
+        <p className="muted">
+          Your progress currently belongs to this development server. Account sign-in, a shared
+          PostgreSQL database, and conflict handling are needed before the web and mobile apps can
+          sync.
+        </p>
+        <p>
+          Wi-Fi, cellular, and background-sync controls will become available with the mobile
+          implementation. This browser does not control those network policies.
+        </p>
       </div>
     </section>
   );

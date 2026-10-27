@@ -1,10 +1,15 @@
-// Screens currently implemented in this preview.
-// The first three (dashboard, builder, studytypes) are Must-Have screens.
-// Dashboard is now implemented; the other two remain placeholders for your partner.
-// "history" is a Should-Have screen (Session History).
-// "settings" is a Should-Have screen (Settings & Preferences).
-// "timer" is a Should-Have screen (Study Timer / Pomodoro).
-export type Screen = "dashboard" | "builder" | "studytypes" | "sync" | "community" | "reflect" | "history" | "settings" | "timer" | "crud-demo";
+// Screen IDs are also the browser's hash routes.
+export type Screen =
+  | "dashboard"
+  | "builder"
+  | "studytypes"
+  | "sync"
+  | "community"
+  | "reflect"
+  | "history"
+  | "settings"
+  | "timer"
+  | "crud-demo";
 
 export interface NavEntry {
   screen: Screen;
@@ -12,54 +17,15 @@ export interface NavEntry {
   enabled: boolean;
 }
 
-export interface StudyFlowTemplate {
-  id: string;
-  title: string;
-  author: string;
-  tag: string;
-  rating: number;
-  usedBy: number;
-}
-
-export interface StudyFlow {
-  id: string;
-  title: string;
-  tag: string;
-  blocks: StudyBlock[];
-  totalMinutes: number;
-}
-
-export interface StudyBlock {
-  id: string;
-  title: string;
-  type: "focus" | "break" | "review" | "recall";
-  durationMinutes: number;
-}
-
-export interface SyncPreferences {
-  autoSyncWifi: boolean;
-  autoSyncCellular: boolean;
-  backgroundSync: boolean;
-}
-
-export interface ReflectionEntry {
-  sessionTitle: string;
-  sessionSubtitle: string;
-  comprehension: number;
-  fatigue: number;
-  notes: string;
-}
-
-export interface SessionLog {
-  id: string;
-  flowTitle: string;
-  flowTag: string;
-  startedAt: string; // ISO timestamp
-  durationMinutes: number;
-  subject: string;
-  hasReflection: boolean;
-  reflection?: ReflectionEntry;
-}
+export type {
+  StudyFlowTemplate,
+  StudyFlow,
+  StudyBlock,
+  StudyType,
+  ReflectionEntry,
+  SessionLog,
+  Workspace,
+} from "../../backend/src/domain";
 
 export interface SettingsPreferences {
   theme: "system" | "light" | "dark";

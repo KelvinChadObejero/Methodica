@@ -1,480 +1,369 @@
-import { useState, useEffect, useRef } from "react";
-import type { StudyFlow, StudyBlock, SessionLog } from "../types";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useWorkspace } from "../lib/useWorkspace";
+import { errorMessage } from "../lib/api";
+import { navigate } from "../lib/navigation";
+import { loadPrefs } from "../lib/preferences";
+import {
+  finishRun,
+  newRun,
+  restoreRun,
+  skipBlock,
+  tick,
+  toggleRun,
+  type TimerRun,
+} from "../lib/timer";
+import type { SessionLog } from "../types";
 
-// ============================================================
-// Preset flows & defaults
-// ============================================================
-
-const PRESET_FLOWS: StudyFlow[] = [
-  {
-    id: "pomodoro",
-    title: "Pomodoro",
-    tag: "Focus",
-    totalMinutes: 25,
-    blocks: [
-      { id: "b1", title: "Focus", type: "focus", durationMinutes: 25 },
-    ],
-  },
-  {
-    id: "pomodoro-long",
-    title: "Pomodoro (Long)",
-    tag: "Focus",
-    totalMinutes: 50,
-    blocks: [
-      { id: "b1", title: "Focus", type: "focus", durationMinutes: 50 },
-    ],
-  },
-  {
-    id: "flow-90",
-    title: "Deep Work (90 min)",
-    tag: "Focus",
-    totalMinutes: 90,
-    blocks: [
-      { id: "b1", title: "Focus", type: "focus", durationMinutes: 90 },
-    ],
-  },
-  {
-    id: "flow-standard",
-    title: "Standard Flow",
-    tag: "Study",
-    totalMinutes: 55,
-    blocks: [
-      { id: "b1", title: "Review", type: "review", durationMinutes: 5 },
-      { id: "b2", title: "Focus", type: "focus", durationMinutes: 25 },
-      { id: "b3", title: "Break", type: "break", durationMinutes: 5 },
-      { id: "b4", title: "Focus", type: "focus", durationMinutes: 20 },
-    ],
-  },
-];
-
-const STORAGE_KEY_SESSIONS = "methodica-sessions";
-
-function loadSessions(): SessionLog[] {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY_SESSIONS);
-    if (stored) return JSON.parse(stored);
-  } catch { }
-  return [];
+function timeLabel(ms: number) {
+  const seconds = Math.ceil(ms / 1000);
+  return `${Math.floor(seconds / 60)
+    .toString()
+    .padStart(2, "0")}:${(seconds % 60).toString().padStart(2, "0")}`;
 }
-
-function saveSessions(sessions: SessionLog[]) {
-  localStorage.setItem(STORAGE_KEY_SESSIONS, JSON.stringify(sessions));
-}
-
-function generateId() {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function formatTime(seconds: number) {
-  const m = Math.floor(seconds / 60).toString().padStart(2, "0");
-  const s = (seconds % 60).toString().padStart(2, "0");
-  return `${m}:${s}`;
-}
-
-function getBlockColor(type: StudyBlock["type"]) {
-  switch (type) {
-    case "focus": return "var(--accent)";
-    case "break": return "#22C55E";
-    case "review": return "#A855F7";
-    case "recall": return "#F59E0B";
-    default: return "var(--accent)";
-  }
-}
-
-function getBlockLabel(type: StudyBlock["type"]) {
-  switch (type) {
-    case "focus": return "Focus";
-    case "break": return "Break";
-    case "review": return "Review";
-    case "recall": return "Recall";
-    default: return type;
-  }
-}
-
-// ============================================================
-// UI Components
-// ============================================================
-
-function FlowSelector({
-  flows,
-  selectedId,
-  onSelect,
-}: {
-  flows: StudyFlow[];
-  selectedId: string;
-  onSelect: (id: string) => void;
-}) {
-  return (
-    <div className="flow-selector">
-      {flows.map((flow) => (
-        <button
-          key={flow.id}
-          className={`flow-chip${selectedId === flow.id ? " active" : ""}`}
-          onClick={() => onSelect(flow.id)}
-        >
-          <span className="flow-chip-tag" style={{ background: getBlockColor(flow.blocks[0]?.type || "focus") }}>
-            {flow.tag}
-          </span>
-          {flow.title}
-          <span className="flow-chip-duration">{flow.totalMinutes} min</span>
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function TimerDisplay({
-  timeLeft,
-  totalTime,
-  block,
-}: {
-  timeLeft: number;
-  totalTime: number;
-  block: StudyBlock | null;
-}) {
-  const progress = totalTime > 0 ? (totalTime - timeLeft) / totalTime : 0;
-  const radius = 120;
-  const stroke = 8;
-  const circumference = 2 * Math.PI * (radius - stroke / 2);
-  const offset = circumference * (1 - progress);
-
-  return (
-    <div className="timer-display">
-      <svg width={radius * 2} height={radius * 2} className="timer-ring">
-        <circle
-          className="ring-bg"
-          cx={radius}
-          cy={radius}
-          r={radius - stroke / 2}
-          strokeWidth={stroke}
-          fill="none"
-        />
-        <circle
-          className="ring-progress"
-          cx={radius}
-          cy={radius}
-          r={radius - stroke / 2}
-          strokeWidth={stroke}
-          fill="none"
-          strokeDasharray={circumference}
-          strokeDashoffset={offset}
-          style={{ stroke: block ? getBlockColor(block.type) : "var(--accent)" }}
-        />
-        <text
-          x={radius}
-          y={radius + 6}
-          textAnchor="middle"
-          dominantBaseline="middle"
-          fontFamily="Space Grotesk, sans-serif"
-          fontSize={48}
-          fontWeight={700}
-          fill="var(--ink)"
-          className="timer-text"
-        >
-          {formatTime(timeLeft)}
-        </text>
-      </svg>
-      {block && (
-        <div className="timer-block-info">
-          <span className="block-type" style={{ color: getBlockColor(block.type) }}>
-            {getBlockLabel(block.type)}
-          </span>
-          <span className="block-title">{block.title}</span>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function TimerControls({
-  isRunning,
-  onStart,
-  onPause,
-  onReset,
-  onSkip,
-  canSkip,
-}: {
-  isRunning: boolean;
-  onStart: () => void;
-  onPause: () => void;
-  onReset: () => void;
-  onSkip: () => void;
-  canSkip: boolean;
-}) {
-  return (
-    <div className="timer-controls">
-      {!isRunning ? (
-        <button className="btn btn-primary btn-lg" onClick={onStart}>
-          Start
-        </button>
-      ) : (
-        <button className="btn btn-primary btn-lg" onClick={onPause}>
-          Pause
-        </button>
-      )}
-      <button className="btn btn-ghost" onClick={onReset}>
-        Reset
-      </button>
-      {canSkip && (
-        <button className="btn btn-ghost" onClick={onSkip}>
-          Skip
-        </button>
-      )}
-    </div>
-  );
-}
-
-function BlockProgress({
-  blocks,
-  currentIndex,
-  timeLeft,
-  totalTime,
-}: {
-  blocks: StudyBlock[];
-  currentIndex: number;
-  timeLeft: number;
-  totalTime: number;
-}) {
-  const blockProgress = totalTime > 0 ? (totalTime - timeLeft) / totalTime : 0;
-
-  return (
-    <div className="block-progress">
-      {blocks.map((block, i) => (
-        <div key={block.id} className={`block-step${i === currentIndex ? " active" : ""}${i < currentIndex ? " done" : ""}`}>
-          <div className="block-step-ring">
-            {i < currentIndex ? (
-              <span className="check">✓</span>
-            ) : i === currentIndex ? (
-              <div className="progress-fill" style={{ width: `${Math.min(100, blockProgress * 100)}%` }} />
-            ) : (
-              <span className="dot" />
-            )}
-          </div>
-          <span className="block-step-label">{block.title}</span>
-          <span className="block-step-time">{block.durationMinutes}m</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function CompletionModal({
-  flow,
-  onReflect,
-  onDone,
-}: {
-  flow: StudyFlow;
-  onReflect: () => void;
-  onDone: () => void;
-}) {
-  return (
-    <div className="modal-overlay" onClick={onDone}>
-      <div className="modal-card completion-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="completion-icon">✓</div>
-        <h3>Session complete!</h3>
-        <p>You finished <b>{flow.title}</b> ({flow.totalMinutes} min).</p>
-        <div className="completion-actions">
-          <button className="btn btn-primary" onClick={onReflect}>
-            Log reflection
-          </button>
-          <button className="btn btn-ghost" onClick={onDone}>
-            Done
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ============================================================
-// Timer Screen
-// ============================================================
 
 export default function Timer() {
-  const [flows] = useState<StudyFlow[]>(PRESET_FLOWS);
-  const [selectedFlowId, setSelectedFlowId] = useState("pomodoro");
-  const [isRunning, setIsRunning] = useState(false);
-  const [currentBlockIndex, setCurrentBlockIndex] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(0);
-  const [showCompletion, setShowCompletion] = useState(false);
+  const { data, studyTypes, saveSession } = useWorkspace();
+  const [run, setRun] = useState<TimerRun | null>(
+    () => restoreRun() || (data?.flows[0] ? newRun(data.flows[0]) : null)
+  );
+  const [prefs, setPrefs] = useState(loadPrefs);
+  const [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState<SessionLog | null>(null);
+  const [error, setError] = useState("");
+  const [storageError, setStorageError] = useState("");
+  const saving = useRef(false);
+  const previousBlock = useRef(run?.blockIndex);
 
-  const selectedFlow = flows.find((f) => f.id === selectedFlowId) || flows[0];
-  const currentBlock = selectedFlow.blocks[currentBlockIndex] || null;
-  const totalTime = currentBlock ? currentBlock.durationMinutes * 60 : 0;
-
-  // Initialize timeLeft when flow/block changes
   useEffect(() => {
-    if (currentBlock) {
-      setTimeLeft(currentBlock.durationMinutes * 60);
-    }
-  }, [selectedFlowId, currentBlockIndex]);
+    if (!run && data?.flows[0]) setRun(newRun(data.flows[0]));
+  }, [run, data?.flows]);
 
-  // Timer tick
-  const intervalRef = useRef<number | null>(null);
   useEffect(() => {
-    if (isRunning && timeLeft > 0) {
-      intervalRef.current = window.setInterval(() => {
-        setTimeLeft((prev) => Math.max(0, prev - 1));
-      }, 1000);
-    } else if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
+    const refresh = () => setPrefs(loadPrefs());
+    window.addEventListener("methodica-preferences", refresh);
+    return () => window.removeEventListener("methodica-preferences", refresh);
+  }, []);
+
+  useEffect(() => {
+    if (!run?.deadline) return;
+    const update = () =>
+      setRun((current) => (current ? tick(current, Date.now(), prefs.autoStartBreaks) : null));
+    update();
+    const interval = window.setInterval(update, 250);
+    window.addEventListener("focus", update);
     return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
+      window.clearInterval(interval);
+      window.removeEventListener("focus", update);
     };
-  }, [isRunning, timeLeft]);
+  }, [run?.deadline, prefs.autoStartBreaks]);
 
-  // Auto-advance to next block
   useEffect(() => {
-    if (isRunning && timeLeft === 0 && currentBlock) {
-      const nextIndex = currentBlockIndex + 1;
-      if (nextIndex < selectedFlow.blocks.length) {
-        setCurrentBlockIndex(nextIndex);
-      } else {
-        // Flow complete
-        setIsRunning(false);
-        setShowCompletion(true);
-        // Save session log
-        saveSession();
-      }
+    try {
+      if (run?.startedAt) sessionStorage.setItem("methodica-active-timer", JSON.stringify(run));
+      else sessionStorage.removeItem("methodica-active-timer");
+    } catch {
+      setStorageError(
+        "This browser cannot retain the timer on refresh. Keep this tab open until your session is saved."
+      );
     }
-  }, [timeLeft, isRunning, currentBlockIndex, selectedFlow]);
+  }, [run]);
 
-  // Keyboard shortcuts
   useEffect(() => {
-    function handleKey(e: KeyboardEvent) {
-      // Ignore if typing in input
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      if (run?.startedAt && !saved) {
+        event.preventDefault();
+        event.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", beforeUnload);
+    return () => window.removeEventListener("beforeunload", beforeUnload);
+  }, [run?.startedAt, saved]);
 
-      switch (e.code) {
-        case "Space":
-          e.preventDefault();
-          isRunning ? setIsRunning(false) : setIsRunning(true);
-          break;
-        case "KeyR":
-          e.preventDefault();
-          resetTimer();
-          break;
-        case "KeyS":
-          e.preventDefault();
-          if (isRunning && currentBlockIndex < selectedFlow.blocks.length - 1) {
-            skipBlock();
-          }
-          break;
+  useEffect(() => {
+    if (
+      run &&
+      previousBlock.current !== run.blockIndex &&
+      prefs.notifications &&
+      "Notification" in window &&
+      Notification.permission === "granted"
+    ) {
+      new Notification("Methodica: next study block", {
+        body: run.flow.blocks[run.blockIndex].title,
+      });
+    }
+    previousBlock.current = run?.blockIndex;
+  }, [run, prefs.notifications]);
+
+  const save = useCallback(
+    async (completed: TimerRun) => {
+      if (saving.current) return;
+      saving.current = true;
+      setBusy(true);
+      setError("");
+      const durationMinutes = Math.floor(completed.elapsedMs / 1000) / 60;
+      try {
+        if (durationMinutes < 1 / 60 || !completed.startedAt)
+          throw new Error("Study for at least one second before saving a session.");
+        const result = await saveSession({
+          id: completed.id,
+          flowId: completed.flow.id,
+          flowTitle: completed.flow.title,
+          flowTag: completed.flow.tag,
+          startedAt: completed.startedAt,
+          subject: completed.flow.tag,
+          durationMinutes,
+          focusMinutes: Math.min(durationMinutes, Math.floor(completed.focusMs / 1000) / 60),
+          status: completed.skipped ? "stopped" : "completed",
+        });
+        setSaved(result);
+        try {
+          sessionStorage.removeItem("methodica-active-timer");
+        } catch {
+          /* Already saved by the API. */
+        }
+      } catch (cause) {
+        setError(errorMessage(cause));
+      } finally {
+        saving.current = false;
+        setBusy(false);
+      }
+    },
+    [saveSession]
+  );
+
+  // One request per completed run. A failed save is retried explicitly with the same ID.
+  const requestedId = useRef<string | null>(null);
+  useEffect(() => {
+    if (run?.completed && !saved && requestedId.current !== run.id) {
+      requestedId.current = run.id;
+      void save(run);
+    }
+  }, [run, saved, save]);
+
+  const toggle = useCallback(
+    () =>
+      setRun((current) => (current ? toggleRun(current, Date.now(), prefs.autoStartBreaks) : null)),
+    [prefs.autoStartBreaks]
+  );
+  const reset = useCallback(() => {
+    if (!run || busy) return;
+    if (
+      run.startedAt &&
+      !saved &&
+      !window.confirm("Discard this timer run and start over? Unsaved study time will be lost.")
+    )
+      return;
+    setRun(newRun(run.flow));
+    setSaved(null);
+    setError("");
+  }, [run, saved, busy]);
+  const skip = useCallback(
+    () =>
+      setRun((current) => (current ? skipBlock(current, Date.now(), prefs.autoStartBreaks) : null)),
+    [prefs.autoStartBreaks]
+  );
+
+  useEffect(() => {
+    function handleKey(event: KeyboardEvent) {
+      if (
+        window.location.hash.split("?")[0] !== "#timer" ||
+        busy ||
+        run?.completed ||
+        event.repeat ||
+        event.ctrlKey ||
+        event.altKey ||
+        event.metaKey
+      )
+        return;
+      if (
+        event.target instanceof HTMLElement &&
+        (event.target.isContentEditable ||
+          event.target.closest("input, textarea, select, button, a"))
+      )
+        return;
+      if (event.code === "Space") {
+        event.preventDefault();
+        toggle();
+      }
+      if (event.code === "KeyR") {
+        event.preventDefault();
+        reset();
+      }
+      if (event.code === "KeyS" && run?.startedAt) {
+        event.preventDefault();
+        skip();
       }
     }
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [isRunning, currentBlockIndex, selectedFlow]);
+  }, [toggle, reset, skip, busy, run?.completed, run?.startedAt]);
 
-  function saveSession() {
-    const sessions = loadSessions();
-    const newSession: SessionLog = {
-      id: generateId(),
-      flowTitle: selectedFlow.title,
-      flowTag: selectedFlow.tag,
-      startedAt: new Date(Date.now() - selectedFlow.totalMinutes * 60 * 1000).toISOString(),
-      durationMinutes: selectedFlow.totalMinutes,
-      subject: selectedFlow.tag,
-      hasReflection: false,
-    };
-    saveSessions([newSession, ...sessions]);
-  }
-
-  function startTimer() {
-    setIsRunning(true);
-  }
-
-  function pauseTimer() {
-    setIsRunning(false);
-  }
-
-  function resetTimer() {
-    setIsRunning(false);
-    setCurrentBlockIndex(0);
-    if (currentBlock) {
-      setTimeLeft(currentBlock.durationMinutes * 60);
+  function reflect() {
+    if (!saved) return;
+    try {
+      sessionStorage.setItem("methodica-reflection-session", saved.id);
+    } catch {
+      /* The reflection picker lists every session. */
     }
+    navigate("reflect");
   }
-
-  function skipBlock() {
-    const nextIndex = currentBlockIndex + 1;
-    if (nextIndex < selectedFlow.blocks.length) {
-      setCurrentBlockIndex(nextIndex);
-    } else {
-      setIsRunning(false);
-      setShowCompletion(true);
-      saveSession();
-    }
-  }
-
-  function handleReflect() {
-    setShowCompletion(false);
-    // Navigate to reflection screen - we'll use a custom event
-    window.dispatchEvent(new CustomEvent("navigate", { detail: "reflect" }));
-  }
-
-  function handleDone() {
-    setShowCompletion(false);
-    resetTimer();
-  }
+  const block = run?.flow.blocks[run.blockIndex];
+  const progress = block && run ? 1 - run.remainingMs / (block.durationMinutes * 60000) : 0;
 
   return (
     <section className="screen timer-screen">
-      <div className="eyebrow">Should-Have &middot; 05</div>
-      <h1 className="page-title">Study timer</h1>
+      <div className="eyebrow">ONE BLOCK AT A TIME</div>
+      <h1 className="page-title">Make room for focus.</h1>
       <p className="page-sub">
-        Run a timed study flow. Choose a preset or build your own in the Flow Builder (coming soon).
+        Choose a saved flow. Pause when you need to; only the time you actually run is logged.
       </p>
-
-      {/* Flow Selector */}
       <div className="card flow-selector-card">
-        <FlowSelector flows={flows} selectedId={selectedFlowId} onSelect={setSelectedFlowId} />
+        <label className="field-label">
+          Study flow
+          <select
+            value={run?.flow.id || ""}
+            disabled={!!run?.startedAt && !saved}
+            onChange={(event) => {
+              const flow = data?.flows.find((item) => item.id === event.target.value);
+              if (flow) {
+                setRun(newRun(flow));
+                setSaved(null);
+                setError("");
+              }
+            }}
+          >
+            <option value="" disabled>
+              Choose a flow
+            </option>
+            {run && !data?.flows.some((flow) => flow.id === run.flow.id) && (
+              <option value={run.flow.id}>{run.flow.title} (session snapshot)</option>
+            )}
+            {data?.flows.map((flow) => (
+              <option key={flow.id} value={flow.id}>
+                {flow.title} · {flow.totalMinutes} min
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
-
-      {/* Timer Display */}
-      <div className="card timer-card">
-        <TimerDisplay
-          timeLeft={timeLeft}
-          totalTime={totalTime}
-          block={currentBlock}
-        />
-        <BlockProgress
-          blocks={selectedFlow.blocks}
-          currentIndex={currentBlockIndex}
-          timeLeft={timeLeft}
-          totalTime={totalTime}
-        />
-        <TimerControls
-          isRunning={isRunning}
-          onStart={startTimer}
-          onPause={pauseTimer}
-          onReset={resetTimer}
-          onSkip={skipBlock}
-          canSkip={currentBlockIndex < selectedFlow.blocks.length - 1}
-        />
-        <div className="timer-hints">
-          <kbd>Space</kbd> Start/Pause &nbsp;·&nbsp;
-          <kbd>R</kbd> Reset &nbsp;·&nbsp;
-          <kbd>S</kbd> Skip
+      {!run || !block ? (
+        <div className="card empty-state">
+          <h2>Your next session starts with a flow.</h2>
+          <p>Create a sequence in the builder, or import a starter template.</p>
+          <button className="btn" onClick={() => navigate("builder")}>
+            Build a flow
+          </button>
         </div>
-      </div>
-
-      {/* Keyboard shortcuts help */}
-      <div className="card shortcuts-card">
-        <h3>Keyboard shortcuts</h3>
-        <div className="shortcuts-grid">
-          <div className="shortcut"><kbd>Space</kbd><span>Start / Pause</span></div>
-          <div className="shortcut"><kbd>R</kbd><span>Reset timer</span></div>
-          <div className="shortcut"><kbd>S</kbd><span>Skip block</span></div>
-          <div className="shortcut"><kbd>← / →</kbd><span>Switch flow</span></div>
+      ) : (
+        <div className="card timer-card">
+          <span className="tag">
+            {run.completed
+              ? "Session ended"
+              : `${run.deadline ? "In progress" : run.startedAt ? "Paused" : "Ready"} · Block ${run.blockIndex + 1} of ${run.flow.blocks.length}`}
+          </span>
+          <div className="timer-display">
+            <svg width="240" height="240" className="timer-ring" aria-hidden="true">
+              <circle className="ring-bg" cx="120" cy="120" r="110" strokeWidth="8" fill="none" />
+              <circle
+                className="ring-progress"
+                cx="120"
+                cy="120"
+                r="110"
+                strokeWidth="8"
+                fill="none"
+                strokeDasharray={Math.PI * 220}
+                strokeDashoffset={Math.PI * 220 * (1 - progress)}
+              />
+            </svg>
+            <div className="timer-clock" role="timer" aria-label="Time remaining">
+              {timeLabel(run.remainingMs)}
+            </div>
+          </div>
+          <h2>{block.title}</h2>
+          <p className="muted">{run.flow.title}</p>
+          <p className="muted block-prompt">
+            {studyTypes.find((item) => item.id === (block.studyTypeId || block.type))?.instructions}
+          </p>
+          <ol className="run-blocks">
+            {run.flow.blocks.map((item, index) => (
+              <li key={item.id} className={index === run.blockIndex ? "current" : ""}>
+                <span>
+                  {String(index + 1).padStart(2, "0")} · {item.title}
+                </span>
+                <span>{item.durationMinutes}m</span>
+              </li>
+            ))}
+          </ol>
+          <div className="timer-controls">
+            <button className="btn btn-lg" disabled={run.completed || busy} onClick={toggle}>
+              {run.deadline ? "Pause" : run.startedAt ? "Resume" : "Start session"}
+            </button>
+            <button className="btn ghost" disabled={busy} onClick={reset}>
+              {saved ? "Study again" : "Reset"}
+            </button>
+            <button
+              className="btn ghost"
+              disabled={
+                run.completed ||
+                !run.startedAt ||
+                run.blockIndex >= run.flow.blocks.length - 1 ||
+                busy
+              }
+              onClick={skip}
+            >
+              Skip block
+            </button>
+          </div>
+          <button
+            className="text-button"
+            disabled={
+              !run.startedAt || run.completed || busy || tick(run, Date.now()).elapsedMs < 1000
+            }
+            onClick={() =>
+              setRun((current) =>
+                current ? finishRun(current, Date.now(), prefs.autoStartBreaks) : null
+              )
+            }
+          >
+            Finish & save elapsed time
+          </button>
+          <p className="muted">
+            {(run.elapsedMs / 60000).toFixed(1)} min elapsed · {(run.focusMs / 60000).toFixed(1)}{" "}
+            min studying
+          </p>
+          <p className="timer-hints">
+            <kbd>Space</kbd> Start/pause · <kbd>R</kbd> Reset · <kbd>S</kbd> Skip
+          </p>
+          {busy && <p role="status">Saving your session…</p>}
+          {storageError && (
+            <p className="feedback" role="status">
+              {storageError}
+            </p>
+          )}
+          {error && (
+            <div className="feedback" role="alert">
+              {error}{" "}
+              {run.completed && (
+                <button className="btn ghost" onClick={() => void save(run)} disabled={busy}>
+                  Retry save
+                </button>
+              )}
+            </div>
+          )}
+          {saved && (
+            <div className="feedback" role="status">
+              <b>Session saved.</b> Find it in your history, or take a moment to reflect.
+              <div className="inline-actions">
+                <button className="btn" onClick={reflect}>
+                  Add reflection
+                </button>
+                <button className="btn ghost" onClick={() => navigate("history")}>
+                  View history
+                </button>
+              </div>
+            </div>
+          )}
         </div>
-      </div>
-
-      {/* Completion Modal */}
-      {showCompletion && (
-        <CompletionModal flow={selectedFlow} onReflect={handleReflect} onDone={handleDone} />
       )}
     </section>
   );

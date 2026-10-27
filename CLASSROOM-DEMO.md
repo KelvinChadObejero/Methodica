@@ -1,6 +1,6 @@
 # Testing the assignments on separate workstations
 
-The deployed Methodica site has a CRUD Demo screen. It connects from each student's browser to Spring Boot running on that same computer. The website does not host the Spring applications: Vercel currently runs the React frontend and the Express placeholder. Each student's H2 database stays on their own computer; user IDs in the Study Flow exercise are not linked to the separate User database.
+The Methodica site has a Classroom CRUD Demo screen. It connects from each student's browser to Spring Boot running on that same computer. The website does not host the Spring applications. The website's Express API now provides a separate local development workspace; the classroom exercises do not share that data. Each student's H2 database stays on their own computer; user IDs in the Study Flow exercise are not linked to the separate User database.
 
 The website changes and both Spring projects must first be committed to the GitHub repository and deployed to Vercel. These files alone do not update the live site. Then each student should pull or download that version of the repository on their own workstation. Install a supported JDK (Java 17 or 21 recommended). The included Maven wrapper downloads Maven and project dependencies the first time, so internet access is required.
 
