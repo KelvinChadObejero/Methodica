@@ -7,6 +7,5 @@ await build({
   platform: "node",
   target: "node24",
   format: "cjs",
-  packages: "external",
   footer: { js: "module.exports = module.exports.default;" },
 });

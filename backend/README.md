@@ -18,7 +18,7 @@ npm start
 
 Listens on `127.0.0.1:4000`, including when `NODE_ENV=production`. Vercel imports the exported app without opening a listener. Health checks: `/health` and `/api/health`. See [the API contract](../docs/API.md) for routes and validation.
 
-Vercel imports `index.cjs`, which exports the compiled CommonJS handler in `dist/vercel/index.cjs`. The build type-checks with TypeScript and bundles internal modules with esbuild, leaving Node dependencies external. `npm test` builds first and smoke-tests the entry point in plain Node with `VERCEL=1`, including a collected CommonJS package scope. The public `/api/studytypes` and `/api/preview` routes do not require workspace storage; private workspace routes still return JSON 503 on Vercel. See [deployment verification](../docs/DEPLOYMENT.md).
+Vercel imports `index.cjs`, which exports the compiled CommonJS handler in `dist/vercel/index.cjs`. The build type-checks with TypeScript and bundles application code plus npm dependencies with esbuild. Only built-in Node modules remain external. `npm test` builds first and smoke-tests the entry point in plain Node with `VERCEL=1`, including relocation into an isolated CommonJS package scope with no node_modules. The public `/api/studytypes` and `/api/preview` routes do not require workspace storage; private workspace routes still return JSON 503 on Vercel. See [deployment verification](../docs/DEPLOYMENT.md).
 
 ## Configuration
 

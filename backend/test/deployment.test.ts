@@ -27,7 +27,8 @@ test("the configured Vercel entry point runs in native Node without a TS loader"
       const preview = await fetch(base + "/api/preview");
       const catalog = await fetch(base + "/api/studytypes");
       const workspace = await fetch(base + "/api/workspace");
-      console.log(JSON.stringify({ health: health.status, preview: preview.status, catalog: catalog.status, workspace: workspace.status, seed: await preview.json() }));
+      const write = await fetch(base + "/api/flows", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "Example" }) });
+      console.log(JSON.stringify({ health: health.status, preview: preview.status, catalog: catalog.status, workspace: workspace.status, write: write.status, seed: await preview.json() }));
     } finally { await new Promise(done => server.close(done)); }
   `;
   const result = JSON.parse(
@@ -41,6 +42,7 @@ test("the configured Vercel entry point runs in native Node without a TS loader"
   assert.equal(result.preview, 200);
   assert.equal(result.catalog, 200);
   assert.equal(result.workspace, 503);
+  assert.equal(result.write, 503);
   assert.equal(result.seed.workspace.sessions.length, 0);
   assert(result.seed.studyTypes.length > 0);
 });
@@ -65,7 +67,7 @@ test("the deployed bundle still starts when collected under a CommonJS package s
       timeout: 15000,
       env: {
         ...process.env,
-        NODE_PATH: fileURLToPath(new URL("../node_modules", import.meta.url)),
+        NODE_PATH: "",
       },
     });
     assert.match(result, /handler-ready/);
