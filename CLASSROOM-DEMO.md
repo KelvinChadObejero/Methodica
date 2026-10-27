@@ -6,13 +6,13 @@ The website changes and both Spring projects must first be committed to the GitH
 
 ## Start your own service
 
-Open PowerShell in the project folder. Set the origin to the exact address of the website shown in the browser's address bar, including `https://`, without a trailing slash or path. The example below is a placeholder, not your actual URL. Use the same URL in the browser after starting the server. This allows that site to talk to the local service; leave the service running only during the demo.
+Open PowerShell in the project folder. The commands below allow your deployed site, https://methodica-azure.vercel.app, to connect to the local service. Open that same address in the browser after starting the server; leave the service running only during the demo. If you use a different preview or custom domain, replace the address with the exact browser origin, including `https://` and without a trailing slash or path.
 
 For the Study Flow assignment:
 
 ```powershell
 cd spring-backend
-$env:DEMO_ALLOWED_ORIGIN = 'https://your-methodica-site.vercel.app'
+$env:DEMO_ALLOWED_ORIGIN = 'https://methodica-azure.vercel.app'
 .\mvnw.cmd spring-boot:run
 ```
 
@@ -20,7 +20,7 @@ For the User assignment, on your partner's computer:
 
 ```powershell
 cd spring-user-backend
-$env:DEMO_ALLOWED_ORIGIN = 'https://your-methodica-site.vercel.app'
+$env:DEMO_ALLOWED_ORIGIN = 'https://methodica-azure.vercel.app'
 .\mvnw.cmd spring-boot:run
 ```
 
