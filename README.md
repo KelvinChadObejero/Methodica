@@ -43,7 +43,7 @@ This API currently stores **one local workspace** in `backend/data/workspace.jso
 
 The v2 proposal specifies **Node.js + Express + TypeScript, PostgreSQL, Prisma, JWT/bcrypt, and Socket.IO**. PostgreSQL migrations, accounts, ownership checks and deployed cross-device persistence are the next foundation tasks. Private workspace endpoints deliberately return 503 on Vercel until persistent database storage is implemented. Public health, technique catalog, and empty starter-preview endpoints remain available. Device mode is a usable preview, not a substitute for this production architecture.
 
-Vercel's backend entry point is `backend/index.cjs`, which exports a compiled CommonJS bundle from `dist/server.cjs`. Native Node smoke tests exercise this exact entry point and a collected CommonJS package scope; lint/build success alone does not verify a deployed function can start. See [DEPLOYMENT.md](docs/DEPLOYMENT.md).
+Vercel's backend entry point is `backend/index.cjs`, which exports a compiled CommonJS bundle from `dist/vercel/index.cjs`. Native Node smoke tests exercise this exact entry point and a collected CommonJS package scope; lint/build success alone does not verify a deployed function can start. See [DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 The Spring Boot projects remain independent classroom exercises with separate local H2 databases. See [CLASSROOM-DEMO.md](CLASSROOM-DEMO.md); they are not the website's production API.
 

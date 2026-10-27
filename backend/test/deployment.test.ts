@@ -2,7 +2,14 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { mkdtempSync, copyFileSync, writeFileSync, rmSync } from "node:fs";
+import {
+  mkdtempSync,
+  copyFileSync,
+  writeFileSync,
+  rmSync,
+  readFileSync,
+  readdirSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -43,10 +50,16 @@ test("the deployed bundle still starts when collected under a CommonJS package s
   try {
     writeFileSync(join(directory, "package.json"), JSON.stringify({ type: "commonjs" }));
     const collected = join(directory, "app.js");
-    copyFileSync(fileURLToPath(new URL("../dist/server.cjs", import.meta.url)), collected);
+    const config = JSON.parse(readFileSync(new URL("../../vercel.json", import.meta.url), "utf8"));
+    const output = config.services.backend.outputDirectory;
+    assert.equal(output, "dist/vercel");
+    assert.deepEqual(readdirSync(fileURLToPath(new URL(`../${output}`, import.meta.url))), [
+      "index.cjs",
+    ]);
+    copyFileSync(fileURLToPath(new URL(`../${output}/index.cjs`, import.meta.url)), collected);
     const entry = pathToFileURL(collected).href;
     const script = `process.env.VERCEL = "1"; const app = (await import(${JSON.stringify(entry)})).default; if (typeof app !== "function") throw new Error("No Express handler exported"); console.log("handler-ready");`;
-    const output = execFileSync(process.execPath, ["--input-type=module", "-e", script], {
+    const result = execFileSync(process.execPath, ["--input-type=module", "-e", script], {
       cwd: directory,
       encoding: "utf8",
       timeout: 15000,
@@ -55,7 +68,7 @@ test("the deployed bundle still starts when collected under a CommonJS package s
         NODE_PATH: fileURLToPath(new URL("../node_modules", import.meta.url)),
       },
     });
-    assert.match(output, /handler-ready/);
+    assert.match(result, /handler-ready/);
   } finally {
     assert(resolve(directory).startsWith(resolve(tmpdir()) + sep + "methodica-vercel-runtime-"));
     rmSync(directory, { recursive: true, force: true });

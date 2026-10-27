@@ -4,9 +4,11 @@ The public website is https://methodica-azure.vercel.app. GitHub's Vercel succes
 
 ## Runtime entry point
 
-The backend service in `vercel.json` builds with `npm run build` and starts from `backend/index.cjs`. That module exports the CommonJS handler bundled into `dist/server.cjs`. Vercel's runtime logs showed an ESM `app.js` being loaded under a CommonJS package scope (`SyntaxError: Cannot use import statement outside a module`). A single explicitly CommonJS bundle avoids relying on the original package scope when function files are collected. Node dependencies remain external for Vercel's dependency tracing.
+The backend service in `vercel.json` builds with `npm run build` and starts from `backend/index.cjs`. That module exports the CommonJS handler bundled into `dist/vercel/index.cjs`. Vercel's runtime logs showed an ESM `app.js` being loaded under a CommonJS package scope (`SyntaxError: Cannot use import statement outside a module`). A single explicitly CommonJS bundle avoids relying on the original package scope when function files are collected. Node dependencies remain external for Vercel's dependency tracing.
 
 `npm test` in the backend first compiles/bundles, then imports the exact deployment entry point in a plain Node process with `VERCEL=1`. A second regression test copies the bundle to an `app.js` under a CommonJS package scope, matching the failed deployed layout. These catch runtime import errors that type checking and the local TypeScript development server do not.
+
+Set the backend service's `outputDirectory` to **`dist/vercel`**. The Vercel backend builder scans output folders after a custom build; without this setting it can select `dist/app.js` ahead of the configured root entry point and package that ESM file without the original package scope. The hosted output directory therefore contains only the intended `index.cjs` bundle. The packaging regression also verifies this directory does not contain a competing `app.js`.
 
 ## Verify a deployment before merging or promoting
 
