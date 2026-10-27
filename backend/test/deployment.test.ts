@@ -2,9 +2,13 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { mkdtempSync, copyFileSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve, sep } from "node:path";
+import { pathToFileURL } from "node:url";
 
 test("the configured Vercel entry point runs in native Node without a TS loader", () => {
-  const entry = new URL("../index.mjs", import.meta.url).href;
+  const entry = new URL("../index.cjs", import.meta.url).href;
   const script = `
     process.env.VERCEL = "1";
     const app = (await import(${JSON.stringify(entry)})).default;
@@ -32,4 +36,28 @@ test("the configured Vercel entry point runs in native Node without a TS loader"
   assert.equal(result.workspace, 503);
   assert.equal(result.seed.workspace.sessions.length, 0);
   assert(result.seed.studyTypes.length > 0);
+});
+
+test("the deployed bundle still starts when collected under a CommonJS package scope", () => {
+  const directory = mkdtempSync(join(tmpdir(), "methodica-vercel-runtime-"));
+  try {
+    writeFileSync(join(directory, "package.json"), JSON.stringify({ type: "commonjs" }));
+    const collected = join(directory, "app.js");
+    copyFileSync(fileURLToPath(new URL("../dist/server.cjs", import.meta.url)), collected);
+    const entry = pathToFileURL(collected).href;
+    const script = `process.env.VERCEL = "1"; const app = (await import(${JSON.stringify(entry)})).default; if (typeof app !== "function") throw new Error("No Express handler exported"); console.log("handler-ready");`;
+    const output = execFileSync(process.execPath, ["--input-type=module", "-e", script], {
+      cwd: directory,
+      encoding: "utf8",
+      timeout: 15000,
+      env: {
+        ...process.env,
+        NODE_PATH: fileURLToPath(new URL("../node_modules", import.meta.url)),
+      },
+    });
+    assert.match(output, /handler-ready/);
+  } finally {
+    assert(resolve(directory).startsWith(resolve(tmpdir()) + sep + "methodica-vercel-runtime-"));
+    rmSync(directory, { recursive: true, force: true });
+  }
 });

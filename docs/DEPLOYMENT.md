@@ -4,9 +4,9 @@ The public website is https://methodica-azure.vercel.app. GitHub's Vercel succes
 
 ## Runtime entry point
 
-The backend service in `vercel.json` builds with `npm run build` and starts from `backend/index.mjs`. That module imports the emitted `dist/index.js`. Do not point the deployed service at `src/index.ts` while its NodeNext imports use `.js` extensions that exist only in the compiled output. Local `tsx` development can resolve those imports and conceal a native Node startup failure.
+The backend service in `vercel.json` builds with `npm run build` and starts from `backend/index.cjs`. That module exports the CommonJS handler bundled into `dist/server.cjs`. Vercel's runtime logs showed an ESM `app.js` being loaded under a CommonJS package scope (`SyntaxError: Cannot use import statement outside a module`). A single explicitly CommonJS bundle avoids relying on the original package scope when function files are collected. Node dependencies remain external for Vercel's dependency tracing.
 
-`npm test` in the backend first compiles, then runs an additional test that imports the exact deployment entry point in a plain Node process with `VERCEL=1`. This catches runtime import errors that type checking and the local development server do not.
+`npm test` in the backend first compiles/bundles, then imports the exact deployment entry point in a plain Node process with `VERCEL=1`. A second regression test copies the bundle to an `app.js` under a CommonJS package scope, matching the failed deployed layout. These catch runtime import errors that type checking and the local TypeScript development server do not.
 
 ## Verify a deployment before merging or promoting
 
