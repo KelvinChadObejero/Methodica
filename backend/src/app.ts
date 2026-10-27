@@ -3,7 +3,7 @@ import cors from "cors";
 import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import { FileStore } from "./store.js";
-import { studyTypes } from "./seed.js";
+import { initialWorkspace, studyTypes } from "./seed.js";
 import type { SessionLog, StudyBlock, StudyFlow } from "./domain.js";
 
 class HttpError extends Error {
@@ -85,10 +85,21 @@ export function createApp(options: { dataFile?: string } = {}) {
   app.use(cors({ origin: process.env.WEB_ORIGIN || "http://localhost:5173" }));
   app.use(express.json({ limit: "256kb" }));
   app.get(["/health", "/api/health"], (_req, res) =>
-    res.json({ status: "ok", service: "methodica-backend", storage: "local-file" })
+    res.json({
+      status: "ok",
+      service: "methodica-backend",
+      storage: process.env.VERCEL && !options.dataFile ? "unconfigured" : "local-file",
+    })
   );
   app.use("/api", (_req, res, next) => {
     res.setHeader("Cache-Control", "no-store");
+    next();
+  });
+  // These endpoints contain only the public catalog and starter content. They
+  // remain available without a database; private workspace routes fail closed.
+  app.get("/api/studytypes", (_req, res) => res.json(studyTypes));
+  app.get("/api/preview", (_req, res) => res.json({ workspace: initialWorkspace(), studyTypes }));
+  app.use("/api", (_req, _res, next) => {
     if (process.env.VERCEL && !options.dataFile)
       return next(
         new HttpError(
@@ -99,7 +110,6 @@ export function createApp(options: { dataFile?: string } = {}) {
     next();
   });
   app.get("/api/workspace", (_req, res) => res.json(store.read()));
-  app.get("/api/studytypes", (_req, res) => res.json(studyTypes));
   app.get("/api/flows", (_req, res) => res.json(store.read().flows));
   app.post("/api/flows", (req, res) => {
     const flow: StudyFlow = { id: randomUUID(), ...flowInput(req.body) };
@@ -256,12 +266,10 @@ export function createApp(options: { dataFile?: string } = {}) {
       res.status(413).json({ message: "Request body is too large." });
     else {
       console.error(error);
-      res
-        .status(500)
-        .json({
-          message:
-            "The workspace could not be read or saved. Check the API terminal and data file; your existing data has not been reset.",
-        });
+      res.status(500).json({
+        message:
+          "The workspace could not be read or saved. Check the API terminal and data file; your existing data has not been reset.",
+      });
     }
   };
   app.use(onError);

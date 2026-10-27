@@ -5,7 +5,7 @@
       "root": "backend",
       "framework": "express",
       "buildCommand": "npm run build",
-      "entrypoint": "src/index.ts"
+      "entrypoint": "index.mjs"
     },
     "frontend": {
       "root": "frontend",

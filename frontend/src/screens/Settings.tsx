@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { DEFAULT_PREFS, applyTheme, loadPrefs, savePrefs } from "../lib/preferences";
-import { api, errorMessage } from "../lib/api";
+import { errorMessage } from "../lib/api";
 import { download, sessionsCsv } from "../lib/export";
-import type { SettingsPreferences, Workspace } from "../types";
+import type { SettingsPreferences } from "../types";
+import { useWorkspace } from "../lib/useWorkspace";
 
 export default function Settings() {
+  const { getWorkspace, data } = useWorkspace();
   const [prefs, setPrefs] = useState(loadPrefs);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -47,7 +49,7 @@ export default function Settings() {
     setError("");
     setMessage("");
     try {
-      const workspace = await api<Workspace>("/workspace");
+      const workspace = await getWorkspace();
       const date = new Date().toISOString().slice(0, 10);
       if (prefs.dataExportFormat === "csv")
         download(
@@ -220,14 +222,14 @@ export default function Settings() {
             <b>Download your data</b>
             <span className="setting-desc">Exports Methodica data from this workspace only.</span>
           </div>
-          <button className="btn ghost" disabled={busy} onClick={() => void exportData()}>
+          <button className="btn ghost" disabled={busy || !data} onClick={() => void exportData()}>
             {busy ? "Preparing…" : "Export data"}
           </button>
         </div>
         <div className="setting-row">
           <div className="setting-label">
             <b>Reset browser preferences</b>
-            <span className="setting-desc">Your saved study data stays in the API.</span>
+            <span className="setting-desc">Your saved study data is not removed.</span>
           </div>
           <button className="btn ghost" onClick={reset}>
             Reset preferences

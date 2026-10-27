@@ -37,7 +37,7 @@ export default function CommunityHub() {
     try {
       await publishFlow(flowId, author);
       setPublishing(false);
-      setMessage("Flow published to this workspace's template collection.");
+      setMessage("Template saved to this workspace's collection.");
     } catch (cause) {
       setError(errorMessage(cause));
     } finally {
@@ -49,8 +49,8 @@ export default function CommunityHub() {
       <div className="eyebrow">LEARN FROM EACH OTHER</div>
       <h1 className="page-title">A good flow is worth sharing.</h1>
       <p className="page-sub">
-        Browse starter flows and templates published in this workspace. Import one, then make it
-        your own.
+        Browse starter flows and templates saved in this workspace. Import one, then make it your
+        own.
       </p>
       <p className="scope-note">
         This is a local template collection. Public accounts, ratings, and moderation are planned
@@ -74,14 +74,15 @@ export default function CommunityHub() {
             setFlowId(data?.flows[0]?.id || "");
           }}
         >
-          + Publish a flow
+          + Save a template
         </button>
       </div>
       {publishing && (
         <form className="card editor-panel publish-form" onSubmit={(event) => void publish(event)}>
-          <h2>Share a saved flow</h2>
+          <h2>Save a flow to your collection</h2>
           <p className="muted">
-            Publishing copies the current blocks. Publish again to update the template.
+            This copies the current blocks into your workspace collection. Save again to update the
+            template. It does not publish to other people.
           </p>
           <fieldset disabled={busy}>
             <label>
@@ -106,7 +107,7 @@ export default function CommunityHub() {
             </label>
             <div className="inline-actions">
               <button className="btn" type="submit">
-                {busy ? "Publishing…" : "Publish template"}
+                {busy ? "Saving…" : "Save template"}
               </button>
               <button className="btn ghost" type="button" onClick={() => setPublishing(false)}>
                 Cancel
@@ -161,7 +162,7 @@ export default function CommunityHub() {
       {!templates.length && (
         <div className="card empty-state">
           <h2>No matching templates yet.</h2>
-          <p>Try a different search or publish your first flow.</p>
+          <p>Try a different search or save your first template.</p>
         </div>
       )}
       <button className="text-button section-link" onClick={() => navigate("builder")}>

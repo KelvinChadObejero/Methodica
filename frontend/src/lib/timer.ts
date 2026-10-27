@@ -87,11 +87,9 @@ export function finishRun(run: TimerRun, now: number, autoStartBreaks = true) {
   return { ...tick(run, now, autoStartBreaks), deadline: null, completed: true, skipped: true };
 }
 
-export function restoreRun(): TimerRun | null {
+export function restoreRun(storageKey = "methodica-active-timer"): TimerRun | null {
   try {
-    const run = JSON.parse(
-      sessionStorage.getItem("methodica-active-timer") || "null"
-    ) as TimerRun | null;
+    const run = JSON.parse(sessionStorage.getItem(storageKey) || "null") as TimerRun | null;
     if (
       !run ||
       typeof run.id !== "string" ||

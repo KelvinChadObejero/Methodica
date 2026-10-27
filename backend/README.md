@@ -18,6 +18,8 @@ npm start
 
 Listens on `127.0.0.1:4000`, including when `NODE_ENV=production`. Vercel imports the exported app without opening a listener. Health checks: `/health` and `/api/health`. See [the API contract](../docs/API.md) for routes and validation.
 
+Vercel imports `index.mjs`, which loads the compiled `dist/index.js` after the build. `npm test` builds first and smoke-tests that entry point in plain Node with `VERCEL=1`. The public `/api/studytypes` and `/api/preview` routes do not require workspace storage; private workspace routes still return JSON 503 on Vercel. See [deployment verification](../docs/DEPLOYMENT.md).
+
 ## Configuration
 
 | Variable     | Default                 | Meaning                                                                                                                           |

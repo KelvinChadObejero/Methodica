@@ -29,17 +29,21 @@ Open http://localhost:5173. Vite proxies `/api` to `127.0.0.1:4000`; both proces
 - Flow library: create, rename, edit, delete, add/remove/reorder blocks, calculate duration.
 - Technique toolkit and starter templates; import a template into the library and publish a saved flow to the local collection.
 - Timer using saved flows, pause/resume, skip, actual elapsed study time, and recovery after refresh in the same tab.
-- Sessions and editable reflections saved by the API; searchable/filterable history.
+- Sessions and editable reflections saved in the selected workspace; searchable/filterable history.
 - Dashboard summaries, subject breakdown, streaks and reports based on saved sessions.
 - Persistent browser theme and defaults; browser notifications for block transitions when permission is granted; Methodica-only JSON/CSV export.
 
 An empty workspace shows no sample history or invented statistics. Sync, public ratings, scheduled reminders, and weekly reports are identified as planned.
 
+On the hosted website, choose **Use this device** while online storage is unavailable. Flows, sessions, reflections, and template copies then persist in this browser only, with an explicit device-storage label. Device data is never automatically uploaded, shared publicly, or merged with the API workspace. JSON/CSV export works in both modes; back up device data before clearing site storage. The public technique catalog works without a database.
+
 ## Development scope and production direction
 
 This API currently stores **one local workspace** in `backend/data/workspace.json`, created on the first write. It is a development adapter, has no user authentication, and is bound to localhost. Do not use it as a public multi-user backend or run multiple writers against its file. `DATA_FILE` can select a separate file for tests or demos.
 
-The v2 proposal specifies **Node.js + Express + TypeScript, PostgreSQL, Prisma, JWT/bcrypt, and Socket.IO**. PostgreSQL migrations, accounts, ownership checks and deployed cross-device persistence are the next foundation tasks. Workspace endpoints deliberately return 503 on Vercel until persistent database storage is implemented. This change does not deploy the website.
+The v2 proposal specifies **Node.js + Express + TypeScript, PostgreSQL, Prisma, JWT/bcrypt, and Socket.IO**. PostgreSQL migrations, accounts, ownership checks and deployed cross-device persistence are the next foundation tasks. Private workspace endpoints deliberately return 503 on Vercel until persistent database storage is implemented. Public health, technique catalog, and empty starter-preview endpoints remain available. Device mode is a usable preview, not a substitute for this production architecture.
+
+Vercel's backend entry point is `backend/index.mjs`, which imports compiled `dist/index.js` after the backend build. A native Node smoke test exercises this exact entry point; lint/build success alone does not verify a deployed function can start. See [DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 The Spring Boot projects remain independent classroom exercises with separate local H2 databases. See [CLASSROOM-DEMO.md](CLASSROOM-DEMO.md); they are not the website's production API.
 
