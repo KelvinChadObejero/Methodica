@@ -1,93 +1,154 @@
-import { useState } from "react";
-import type { ReflectionEntry } from "../types";
+import { useState, type FormEvent } from "react";
+import { useWorkspace } from "../lib/useWorkspace";
+import { errorMessage } from "../lib/api";
+import { navigate } from "../lib/navigation";
+import type { SessionLog } from "../types";
 
-const SESSION: Pick<ReflectionEntry, "sessionTitle" | "sessionSubtitle"> = {
-  sessionTitle: "Biology Midterm — session complete",
-  sessionSubtitle: "Concept Map → Active Recall → Self-Explain · 45 min",
-};
-
-export default function Reflection() {
-  const [comprehension, setComprehension] = useState(4);
-  const [fatigue, setFatigue] = useState(2);
-  const [notes, setNotes] = useState("");
-  const [submitted, setSubmitted] = useState(false);
-
-  function handleSubmit() {
-    const entry: ReflectionEntry = {
-      ...SESSION,
-      comprehension,
-      fatigue,
-      notes,
-    };
-    // Placeholder for POST /api/sessions/:id/log — wire up once the
-    // StudySession endpoints exist.
-    console.log("Reflection submitted:", entry);
-    setSubmitted(true);
+function selectedSessionId() {
+  try {
+    return sessionStorage.getItem("methodica-reflection-session") || "";
+  } catch {
+    return "";
   }
-
+}
+function ReflectionForm({ session }: { session: SessionLog }) {
+  const { saveReflection } = useWorkspace();
+  const [comprehension, setComprehension] = useState(session.reflection?.comprehension || 3);
+  const [fatigue, setFatigue] = useState(session.reflection?.fatigue || 3);
+  const [notes, setNotes] = useState(session.reflection?.notes || "");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    setSubmitted(false);
+    try {
+      await saveReflection(session.id, { comprehension, fatigue, notes });
+      setSubmitted(true);
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      setBusy(false);
+    }
+  }
   return (
-    <section className="screen">
-      <div className="eyebrow">Should-Have &middot; 03</div>
-      <h1 className="page-title">Post-session reflection</h1>
-      <p className="page-sub">
-        A short check-in after every session, so Methodica can learn which flows actually work for
-        you.
+    <form className="card reflect-card" onSubmit={(event) => void submit(event)}>
+      <h2>{session.flowTitle}</h2>
+      <p className="sub">
+        {session.subject} · {new Date(session.startedAt).toLocaleString()} ·{" "}
+        {session.durationMinutes.toFixed(1)} min
       </p>
-
-      <div className="card reflect-card">
-        <h3>{SESSION.sessionTitle}</h3>
-        <p className="sub">{SESSION.sessionSubtitle}</p>
-
+      <fieldset disabled={busy} onChange={() => setSubmitted(false)}>
         <div className="slider-block">
-          <div className="top">
+          <label className="top" htmlFor="comprehension">
             <b>Comprehension</b>
-            <span className="val">{comprehension}</span>
-          </div>
+            <span className="val">{comprehension}/5</span>
+          </label>
           <input
+            id="comprehension"
             type="range"
             min={1}
             max={5}
             value={comprehension}
-            onChange={(e) => setComprehension(Number(e.target.value))}
+            onChange={(event) => setComprehension(Number(event.target.value))}
           />
           <div className="scale-labels">
             <span>Foggy</span>
             <span>Crystal clear</span>
           </div>
         </div>
-
         <div className="slider-block">
-          <div className="top">
+          <label className="top" htmlFor="fatigue">
             <b>Mental fatigue</b>
-            <span className="val">{fatigue}</span>
-          </div>
+            <span className="val">{fatigue}/5</span>
+          </label>
           <input
+            id="fatigue"
             type="range"
             min={1}
             max={5}
             value={fatigue}
-            onChange={(e) => setFatigue(Number(e.target.value))}
+            onChange={(event) => setFatigue(Number(event.target.value))}
           />
           <div className="scale-labels">
             <span>Fresh</span>
             <span>Drained</span>
           </div>
         </div>
-
-        <textarea
-          placeholder="Optional notes — what worked, what didn't..."
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-        />
-
-        <button className="btn" style={{ width: "100%" }} onClick={handleSubmit}>
-          Log reflection
+        <label>
+          What worked? What would you change?
+          <textarea
+            maxLength={5000}
+            placeholder="Optional notes for your next session…"
+            value={notes}
+            onChange={(event) => setNotes(event.target.value)}
+          />
+        </label>
+        <button className="btn full-width" type="submit">
+          {busy ? "Saving…" : session.hasReflection ? "Update reflection" : "Save reflection"}
         </button>
+      </fieldset>
+      {error && (
+        <p className="feedback" role="alert">
+          {error}
+        </p>
+      )}
+      {submitted && (
+        <p className="feedback" role="status">
+          Reflection saved to this session.{" "}
+          <button type="button" className="text-button" onClick={() => navigate("history")}>
+            View history →
+          </button>
+        </p>
+      )}
+    </form>
+  );
+}
 
-        <div className={`confirm${submitted ? " show" : ""}`}>
-          &#10003; Logged &mdash; saved to your session history.
+export default function Reflection() {
+  const { data } = useWorkspace();
+  const [selectedId, setSelectedId] = useState(selectedSessionId);
+  const sessions = [...(data?.sessions || [])].sort(
+    (a, b) => Date.parse(b.startedAt) - Date.parse(a.startedAt)
+  );
+  const session =
+    sessions.find((item) => item.id === selectedId) ||
+    sessions.find((item) => !item.hasReflection) ||
+    sessions[0];
+  return (
+    <section className="screen">
+      <div className="eyebrow">PAUSE. NOTICE. ADJUST.</div>
+      <h1 className="page-title">A moment to reflect.</h1>
+      <p className="page-sub">
+        Notice what helped you understand, and what took your energy. Carry that into your next
+        session.
+      </p>
+      {!session ? (
+        <div className="card empty-state">
+          <h2>Something to reflect on, soon.</h2>
+          <p>Run a study flow first. Your saved session will appear here.</p>
+          <button className="btn" onClick={() => navigate("timer")}>
+            Start a session
+          </button>
         </div>
-      </div>
+      ) : (
+        <>
+          <label className="session-picker">
+            Choose a session
+            <select value={session.id} onChange={(event) => setSelectedId(event.target.value)}>
+              {sessions.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.flowTitle} · {new Date(item.startedAt).toLocaleString()}
+                  {item.hasReflection ? " · Reflected" : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+          <ReflectionForm key={session.id} session={session} />
+        </>
+      )}
     </section>
   );
 }

@@ -8,6 +8,7 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "lint": "eslint .",
+    "test": "tsx --test test/api.test.ts",
     "format": "prettier --write ."
   },
   "dependencies": {

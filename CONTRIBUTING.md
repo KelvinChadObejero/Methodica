@@ -22,6 +22,7 @@ Plain, descriptive, present tense: `add sync settings toggle state`, not `fixed 
 
 ```bash
 npm run lint      # inside frontend/ or backend/
+npm test          # timer/analytics or HTTP persistence tests
 npm run format    # auto-fixes formatting
 npm run build     # must succeed
 ```
@@ -32,4 +33,4 @@ Color, type, and component conventions live in `DESIGN.md` at the repo root — 
 
 ## Scope
 
-Check `README.md` for who owns which requirement (Section 9 of the proposal has the full MoSCoW list with owners). If you're picking up something unassigned, say so in the team chat first so you don't duplicate work.
+Check `PROJECT_TODO.md` for task IDs, owners, priorities, dependencies and acceptance criteria. Claim a task there before starting so you do not duplicate work. Preserve the ownership in proposal section 9 and agree on unassigned leads at sprint planning. Link the task ID in your PR and ask the other teammate to review it.
