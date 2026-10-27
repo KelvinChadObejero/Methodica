@@ -22,9 +22,10 @@ function timeLabel(ms: number) {
 }
 
 export default function Timer() {
-  const { data, studyTypes, saveSession } = useWorkspace();
+  const { data, studyTypes, mode, saveSession } = useWorkspace();
+  const storageKey = mode === "device" ? "methodica-device-active-timer" : "methodica-active-timer";
   const [run, setRun] = useState<TimerRun | null>(
-    () => restoreRun() || (data?.flows[0] ? newRun(data.flows[0]) : null)
+    () => restoreRun(storageKey) || (data?.flows[0] ? newRun(data.flows[0]) : null)
   );
   const [prefs, setPrefs] = useState(loadPrefs);
   const [busy, setBusy] = useState(false);
@@ -59,14 +60,14 @@ export default function Timer() {
 
   useEffect(() => {
     try {
-      if (run?.startedAt) sessionStorage.setItem("methodica-active-timer", JSON.stringify(run));
-      else sessionStorage.removeItem("methodica-active-timer");
+      if (run?.startedAt) sessionStorage.setItem(storageKey, JSON.stringify(run));
+      else sessionStorage.removeItem(storageKey);
     } catch {
       setStorageError(
         "This browser cannot retain the timer on refresh. Keep this tab open until your session is saved."
       );
     }
-  }, [run]);
+  }, [run, storageKey]);
 
   useEffect(() => {
     const beforeUnload = (event: BeforeUnloadEvent) => {
@@ -117,7 +118,7 @@ export default function Timer() {
         });
         setSaved(result);
         try {
-          sessionStorage.removeItem("methodica-active-timer");
+          sessionStorage.removeItem(storageKey);
         } catch {
           /* Already saved by the API. */
         }
@@ -128,7 +129,7 @@ export default function Timer() {
         setBusy(false);
       }
     },
-    [saveSession]
+    [saveSession, storageKey]
   );
 
   // One request per completed run. A failed save is retried explicitly with the same ID.

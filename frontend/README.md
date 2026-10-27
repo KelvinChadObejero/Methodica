@@ -23,7 +23,7 @@ Start the API in a second terminal (`cd backend; npm run dev` from the repo root
 - `src/types.ts`: screen/settings types and type-only re-exports of the API contract in `backend/src/domain.ts`.
 - `src/screens/`: dashboard, flow builder, technique toolkit, timer, history, reflection, local templates, connection status, settings and separate classroom demo.
 
-The timer remains mounted while navigating between screens. Active runs use session storage in the same tab for refresh recovery. Ended sessions and reflections live in the API, not only in browser storage. Multiple tabs do not coordinate active timers yet. Unsaved builder/reflection form drafts are not retained when leaving the screen.
+The timer remains mounted while navigating between screens. Active runs use session storage in the same tab for refresh recovery, with separate keys for API and device modes. Ended sessions and reflections live in the selected workspace. If the online workspace is unavailable, an explicit **Use this device** action creates/reopens a browser-only workspace. Its saves and exports never call private API mutation routes, and switching to the API does not upload/merge browser data. Corrupt or full browser storage fails visibly. Multiple tabs do not coordinate active timers yet. Unsaved builder/reflection form drafts are not retained when leaving the screen.
 
 Notifications are limited to block transitions while a tab is open and browser permission is granted. Scheduled reminders, weekly reports, public ratings, account sync, and the proposal's complete research catalog are backlog work. Existing legacy `methodica-sessions` browser records are not automatically imported; do not clear them before an agreed migration.
 

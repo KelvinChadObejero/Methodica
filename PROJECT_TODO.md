@@ -24,6 +24,8 @@ All of these run locally on the Express development API. None imply that account
 - [x] **S2-LOCAL · Kelvin reviews:** import starter templates into the saved library; publish/update a flow snapshot in the local collection. No fabricated users or ratings.
 - [x] **FIX-02 · Kelvin reviews:** restore saved theme on startup; make JSON/CSV exports respect the format and contain only Methodica data; reset browser preferences without deleting unrelated site storage.
 - [x] **QA-01 · Both review:** test timer timing/pause/skip/refresh, range analytics and CSV; integration-test API validation, parallel writes, restart persistence, corrupt-file preservation, and duplicate-save behavior; run tests in CI.
+- [x] **DEPLOY-FIX-01 · Both review:** use a compiled JavaScript Vercel entry point and smoke-test it in native Node; serve the public catalog without database storage; replace blank hosted pages with recovery and explicit browser-only workspace access. Device mode does not fulfill account/database/sync requirements.
+- [ ] **DEPLOY-QA-01 · Both:** verify the exact Vercel preview and production API/pages after each deployment, using [the deployment checklist](docs/DEPLOYMENT.md). Confirm database provisioning and environment configuration with team access before starting DB-02 hosting integration.
 
 ## Next milestone: private student workspace
 

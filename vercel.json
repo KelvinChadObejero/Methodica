@@ -5,7 +5,8 @@
       "root": "backend",
       "framework": "express",
       "buildCommand": "npm run build",
-      "entrypoint": "src/index.ts"
+      "outputDirectory": "dist/vercel",
+      "entrypoint": "index.cjs"
     },
     "frontend": {
       "root": "frontend",

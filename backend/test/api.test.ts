@@ -17,6 +17,10 @@ test("hosted workspace requests fail clearly until durable storage is configured
     assert(address && typeof address !== "string");
     const base = `http://127.0.0.1:${address.port}`;
     assert.equal((await fetch(base + "/api/health")).status, 200);
+    assert.equal((await fetch(base + "/api/studytypes")).status, 200);
+    const preview = await fetch(base + "/api/preview");
+    assert.equal(preview.status, 200);
+    assert.equal((await preview.json()).workspace.sessions.length, 0);
     const response = await fetch(base + "/api/workspace");
     assert.equal(response.status, 503);
     assert.match((await response.json()).message, /Persistent database/);

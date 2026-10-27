@@ -3,11 +3,15 @@ import type { ReflectionEntry, SessionLog, StudyFlow, StudyType, Workspace } fro
 
 export interface WorkspaceContextValue {
   data: Workspace | null;
+  mode: "server" | "device";
   studyTypes: StudyType[];
   loading: boolean;
   error: string;
   refreshedAt: Date | null;
   reload: () => Promise<void>;
+  startDevice: () => Promise<void>;
+  connectServer: () => Promise<void>;
+  getWorkspace: () => Promise<Workspace>;
   saveFlow: (flow: StudyFlow, isNew: boolean) => Promise<StudyFlow>;
   deleteFlow: (id: string) => Promise<void>;
   saveSession: (session: Omit<SessionLog, "hasReflection" | "reflection">) => Promise<SessionLog>;

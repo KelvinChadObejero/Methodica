@@ -1,12 +1,15 @@
 import { useWorkspace } from "../lib/useWorkspace";
 
 export default function SyncSettings() {
-  const { data, loading, error, refreshedAt, reload } = useWorkspace();
+  const { data, mode, loading, error, refreshedAt, reload, connectServer, startDevice } =
+    useWorkspace();
   return (
     <section className="screen">
       <div className="eyebrow">YOUR WORKSPACE CONNECTION</div>
       <h1 className="page-title">Keep your progress close.</h1>
-      <p className="page-sub">Reload flows, sessions, and templates saved by this local API.</p>
+      <p className="page-sub">
+        See where your study data is saved and reload the current workspace.
+      </p>
       <div className="card sync-status">
         <div className="sync-icon" aria-hidden="true">
           ↻
@@ -14,12 +17,14 @@ export default function SyncSettings() {
         <div className="info">
           <b>
             {loading
-              ? "Connecting…"
-              : error
-                ? "Connection needs attention"
-                : data
-                  ? "Connected to local API"
-                  : "Not connected"}
+              ? "Loading…"
+              : mode === "device" && data
+                ? "Saved in this browser"
+                : error
+                  ? "Online workspace unavailable"
+                  : data
+                    ? "Connected to study API"
+                    : "Not connected"}
           </b>
           <p>
             {refreshedAt
@@ -40,16 +45,45 @@ export default function SyncSettings() {
         </button>
       </div>
       <div className="card editor-panel">
-        <h2>Cross-device sync is planned.</h2>
+        <h2>
+          {mode === "device"
+            ? "This workspace stays on this device."
+            : "Cross-device sync is planned."}
+        </h2>
         <p className="muted">
-          Your progress currently belongs to this development server. Account sign-in, a shared
-          PostgreSQL database, and conflict handling are needed before the web and mobile apps can
-          sync.
+          {mode === "device"
+            ? "Flows, session history, reflections, and templates are stored in this browser. They are not sent to the study API. Export a backup in Settings before clearing site data or changing devices."
+            : "Online workspaces need account sign-in and shared storage before web and mobile can sync. The classroom CRUD exercises use their own separate workstation databases."}
         </p>
         <p>
-          Wi-Fi, cellular, and background-sync controls will become available with the mobile
-          implementation. This browser does not control those network policies.
+          Switching workspaces does not copy, upload, or delete your device data. Online storage and
+          device storage are kept separate.
         </p>
+        {mode === "device" ? (
+          <button
+            className="btn ghost"
+            disabled={loading}
+            onClick={() =>
+              void connectServer().catch(() => {
+                /* Keep device data and show the online error. */
+              })
+            }
+          >
+            Check online workspace
+          </button>
+        ) : (
+          <button
+            className="btn ghost"
+            disabled={loading}
+            onClick={() =>
+              void startDevice().catch(() => {
+                /* The banner presents storage errors. */
+              })
+            }
+          >
+            Use a device workspace
+          </button>
+        )}
       </div>
     </section>
   );

@@ -4,6 +4,8 @@ The existing website uses one Express + TypeScript API. This iteration provides 
 
 ## Endpoints
 
+Public endpoints also include `GET /api/preview`, returning `{workspace, studyTypes}` with starter flows/templates and an empty session history. The frontend uses it only to initialize an explicitly selected browser-only workspace. Health, preview and StudyTypes remain available on Vercel without database storage; the private workspace routes below fail closed with JSON 503 until hosted account/storage support exists. Browser-only saves never call those mutation routes.
+
 | Method | Path                        | Behavior                                                                                                                                                   |
 | ------ | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | GET    | `/health`, `/api/health`    | Service status and storage adapter. Health does not prove the data file is readable.                                                                       |

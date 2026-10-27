@@ -8,11 +8,18 @@ export async function api<T>(path: string, method = "GET", body?: unknown): Prom
       signal: AbortSignal.timeout(15000),
     });
   } catch {
-    throw new Error("Could not reach the API. Start the backend and try again.");
+    throw new Error("Could not reach the study service. Check your connection and try again.");
   }
   if (!response.ok) {
     const error = await response.json().catch(() => null);
-    throw new Error(error?.message || `Request failed (${response.status}).`);
+    throw new Error(
+      response.status === 503
+        ? "The online workspace is not available yet. You can study on this device while online storage is being configured."
+        : error?.message ||
+            (response.status >= 500
+              ? "The study service is temporarily unavailable. Please try again."
+              : `Request failed (${response.status}).`)
+    );
   }
   if (response.status === 204) return undefined as T;
   const contentType = response.headers.get("content-type");
