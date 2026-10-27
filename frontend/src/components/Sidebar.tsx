@@ -4,6 +4,7 @@ const CORE_ITEMS: NavEntry[] = [
   { screen: "dashboard", label: "Dashboard", enabled: true },
   { screen: "builder", label: "Flow Builder", enabled: false },
   { screen: "studytypes", label: "StudyTypes", enabled: false },
+  { screen: "crud-demo", label: "CRUD Demo", enabled: true },
 ];
 
 const SHOULD_HAVE_ITEMS: NavEntry[] = [

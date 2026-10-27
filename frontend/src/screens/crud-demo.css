@@ -1,0 +1,29 @@
+.crud-demo { max-width: 1120px; margin: 0 auto; }
+.crud-demo header > p:last-child, .crud-card > p, .crud-heading p { color: var(--ink-soft); font-size: 14px; line-height: 1.5; }
+.crud-eyebrow { color: var(--accent); font-weight: 700; font-size: 11px; letter-spacing: .12em; }
+.crud-demo h1 { font-size: 30px; }
+.crud-demo h2 { font-size: 19px; }
+.crud-notice { margin: 26px 0 22px; background: var(--accent-soft); border-radius: var(--radius); padding: 16px 20px; font-size: 14px; }
+.crud-notice p { margin: 5px 0 0; line-height: 1.5; color: var(--ink-soft); }
+.crud-tabs { display: flex; gap: 8px; border-bottom: 1px solid var(--line); }
+.crud-tabs button { background: none; border: 0; border-bottom: 2px solid transparent; padding: 12px 16px; color: var(--ink-soft); font-size: 14px; }
+.crud-tabs button.selected { border-color: var(--accent); color: var(--ink); font-weight: 600; }
+.crud-status { min-height: 22px; font-size: 13px; color: var(--ink-soft); }
+.crud-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 18px; align-items: start; }
+.crud-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 22px; min-width: 0; }
+.crud-heading { display: flex; justify-content: space-between; gap: 12px; align-items: start; }
+.crud-heading p { margin: 6px 0; }
+.crud-empty { padding: 22px 0; }
+.crud-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; border-top: 1px solid var(--line); padding: 16px 0; overflow-wrap: anywhere; }
+.crud-row p { font-size: 12px; color: var(--ink-soft); margin: 5px 0 0; }
+.crud-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.crud-actions button, .crud-secondary, .crud-primary { border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 7px; padding: 9px 12px; font-size: 13px; }
+.crud-actions .crud-primary { background: var(--accent); color: white; border-color: var(--accent); }
+.crud-form { display: grid; gap: 14px; margin-top: 20px; }
+.crud-form label { display: grid; gap: 6px; font-size: 13px; font-weight: 600; }
+.crud-form input:not([type="checkbox"]), .crud-form textarea, .crud-form select { width: 100%; border: 1px solid var(--line); border-radius: 7px; background: var(--bg); color: var(--ink); padding: 10px; font: inherit; }
+.crud-form textarea { resize: vertical; min-height: 80px; }
+.crud-form .crud-check { display: flex; align-items: center; }
+.crud-form small { color: var(--ink-soft); font-weight: 400; }
+.crud-demo button:disabled { opacity: .55; cursor: wait; }
+@media (max-width: 800px) { .crud-grid { grid-template-columns: 1fr; } .crud-heading { flex-wrap: wrap; } }

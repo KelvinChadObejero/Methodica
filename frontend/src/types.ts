@@ -4,7 +4,7 @@
 // "history" is a Should-Have screen (Session History).
 // "settings" is a Should-Have screen (Settings & Preferences).
 // "timer" is a Should-Have screen (Study Timer / Pomodoro).
-export type Screen = "dashboard" | "builder" | "studytypes" | "sync" | "community" | "reflect" | "history" | "settings" | "timer";
+export type Screen = "dashboard" | "builder" | "studytypes" | "sync" | "community" | "reflect" | "history" | "settings" | "timer" | "crud-demo";
 
 export interface NavEntry {
   screen: Screen;

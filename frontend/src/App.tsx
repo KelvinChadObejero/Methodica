@@ -7,6 +7,7 @@ import Reflection from "./screens/Reflection";
 import SessionHistory from "./screens/SessionHistory";
 import Settings from "./screens/Settings";
 import Timer from "./screens/Timer";
+import CrudDemo from "./screens/CrudDemo";
 import type { Screen } from "./types";
 
 export default function App() {
@@ -35,6 +36,7 @@ export default function App() {
         {screen === "history" && <SessionHistory />}
         {screen === "timer" && <Timer />}
         {screen === "settings" && <Settings />}
+        {screen === "crud-demo" && <CrudDemo />}
       </main>
     </>
   );
