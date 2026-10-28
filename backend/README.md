@@ -1,54 +1,29 @@
-# Methodica development API
+# Methodica account and study API
 
-Express + TypeScript. Provides a usable local study journey while the proposal's PostgreSQL/Prisma and account foundation is built.
+Express + TypeScript, PostgreSQL, Prisma and Better Auth. Every account has its own workspace. Public health, technique catalog and starter preview do not require a login.
 
-## Run
+## Local development
 
-```powershell
-npm ci
-npm run dev
-```
+Run `npm ci`, then `npm run dev:local` in backend. This starts persistent local Prisma Postgres, applies migrations, and runs the API on `127.0.0.1:4000`. Start the frontend separately and open `http://localhost:5173`. Local database data stays on your machine. The generated signing secret lives in ignored `backend/data/local-auth-secret`. This command never uses the production database.
 
-Or compile and run a regular Node server:
+For your own PostgreSQL instance, copy `.env.example` to ignored `.env`, set DATABASE_URL, a random BETTER_AUTH_SECRET of at least 32 characters, and BETTER_AUTH_URL to the frontend origin. Run `npm run db:migrate`, then `npm run dev`. Build generates Prisma Client, type-checks and bundles; `npm start` runs compiled code with environment supplied by your process manager.
 
-```powershell
-npm run build
-npm start
-```
+The old unauthenticated file adapter requires ALLOW_LOCAL_WORKSPACE=true outside Vercel. It is never a production fallback and its records are never automatically assigned to an account.
 
-Listens on `127.0.0.1:4000`, including when `NODE_ENV=production`. Vercel imports the exported app without opening a listener. Health checks: `/health` and `/api/health`. See [the API contract](../docs/API.md) for routes and validation.
+## Accounts
 
-Vercel imports `index.cjs`, which exports the compiled CommonJS handler in `dist/vercel/index.cjs`. The build type-checks with TypeScript and bundles application code plus npm dependencies with esbuild. Only built-in Node modules remain external. `npm test` builds first and smoke-tests the entry point in plain Node with `VERCEL=1`, including relocation into an isolated CommonJS package scope with no node_modules. The public `/api/studytypes` and `/api/preview` routes do not require workspace storage; private workspace routes still return JSON 503 on Vercel. See [deployment verification](../docs/DEPLOYMENT.md).
+Registration signs in immediately. Better Auth normalizes emails and hashes passwords with scrypt; passwords require 12–128 characters. Revocable seven-day sessions use HttpOnly, SameSite=Lax cookies, Secure on hosted HTTPS. Database-backed throttling limits login and registration across function instances. Private writes validate Origin; ownership always comes from the session. Workspace documents use PostgreSQL JSON with row locks for concurrent updates.
 
-## Configuration
+Email verification/reset, mentor roles, normalized study tables, device imports and automatic live synchronization remain follow-up work. See [AUTH.md](../docs/AUTH.md) and [API.md](../docs/API.md).
 
-| Variable     | Default                 | Meaning                                                                                                                           |
-| ------------ | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `PORT`       | `4000`                  | Local API port; update the Vite proxy if changed.                                                                                 |
-| `DATA_FILE`  | `data/workspace.json`   | Workspace file relative to the backend working directory; prefer an absolute path for custom locations.                           |
-| `WEB_ORIGIN` | `http://localhost:5173` | Allowed browser origin for direct cross-origin requests. Vite's same-origin proxy avoids this requirement for normal development. |
+## Deployment
 
-No `.env` loader is installed: set variables in your shell/environment. Example for an isolated demo:
+Connect Neon to Methodica in Vercel. Required variables: DATABASE_URL, BETTER_AUTH_SECRET, and production BETTER_AUTH_URL=https://methodica-azure.vercel.app. Preview and production use different signing secrets; preview trusts only its exact deployment/branch origins. Never expose secrets through VITE_ variables.
 
-```powershell
-$env:DATA_FILE = 'C:\path\to\demo-workspace.json'
-npm run dev
-```
+Vercel applies checked-in migrations before building. Preview and production currently share the connected database, so migrations must remain additive and compatible with main. Separate preview storage before destructive changes; never reset during a deployment.
 
-The file is created on the first write with starter flows and templates; history starts empty. Writes serialize in one process and use temporary-file replacement. A corrupt/unreadable file returns an error and is never silently replaced. Back it up before manual edits. `backend/data/` is ignored by Git.
+The native CommonJS bridge dist/vercel/index.cjs imports a self-contained ESM server.mjs, as Better Auth requires ESM. The dedicated output directory prevents Vercel from selecting another generated entry. See [deployment verification](../docs/DEPLOYMENT.md).
 
-## Limits
+## Checks
 
-This adapter is local, unauthenticated, single-workspace, and single-process. It is not suitable for shared/public hosting, multiple API instances, or network-file storage. CORS is not authentication. Vercel workspace routes return 503 because its filesystem cannot provide the proposed durable database behavior. A health response is only a process check.
-
-The production target from proposal v2 is PostgreSQL + Prisma, bcrypt/JWT accounts and authorization, and Socket.IO sync. Retain the two Spring Boot projects as independent assignment evidence. Do not build competing production APIs. See [the project checklist](../PROJECT_TODO.md) for owners and acceptance tests.
-
-## Check
-
-```powershell
-npm run lint
-npm test
-npm run build
-```
-
-The HTTP integration test starts an ephemeral loopback server against a temporary file. It covers the complete local persistence journey, validation, missing routes, exact retry/conflicting session IDs, import deduplication, parallel writes, restart durability, and corrupt-file preservation.
+Run `npm run lint`, `npm test`, and `npm run build`. Legacy API tests use a temporary file; account tests use disposable local Prisma Postgres, or CI's isolated PostgreSQL 17 service via TEST_DATABASE_URL. Tests never use a developer's DATABASE_URL. Coverage includes registration, validation, duplicate emails, generic login errors, cookies, logout/revocation, expiry, two-user ownership, origin checks, concurrent writes, persistence, database throttling and the exact hosted bundle with database requests.

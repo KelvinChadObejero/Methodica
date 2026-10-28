@@ -2230,3 +2230,146 @@ button:disabled {
   max-width: 60ch;
   margin: 0 auto;
 }
+.account-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.account-actions .btn {
+  font-size: 12px;
+}
+.account-name {
+  font-size: 13px;
+  color: var(--ink);
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.auth-screen {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  align-items: start;
+  gap: 48px;
+  max-width: 1080px;
+  margin: 38px auto;
+}
+.auth-intro {
+  padding-top: 30px;
+}
+.auth-intro .page-title {
+  max-width: 12ch;
+}
+.auth-benefit {
+  display: flex;
+  gap: 18px;
+  padding: 24px;
+  margin-top: 38px;
+}
+.auth-benefit > span {
+  color: var(--accent);
+  font-size: 28px;
+}
+.auth-benefit h2 {
+  font-size: 17px;
+  margin: 0 0 10px;
+}
+.auth-benefit p {
+  line-height: 1.7;
+  margin: 0;
+}
+.auth-panel h2 {
+  margin-top: 0;
+}
+.auth-form {
+  margin-top: 26px;
+}
+.auth-form fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.auth-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  font-size: 13px;
+  margin-bottom: 18px;
+}
+.auth-form input:not([type="checkbox"]) {
+  width: 100%;
+  min-height: 45px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--ink);
+  font: inherit;
+}
+.auth-form input:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 1000px var(--surface) inset;
+  -webkit-text-fill-color: var(--ink);
+}
+.auth-switch .text-btn {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.auth-form .auth-show {
+  flex-direction: row;
+  align-items: center;
+  gap: 9px;
+}
+.auth-form .auth-show input {
+  width: auto;
+}
+.auth-form fieldset:disabled {
+  opacity: 0.65;
+}
+.auth-form #password-help {
+  font-size: 12px;
+  line-height: 1.6;
+  margin-top: -8px;
+}
+.auth-submit {
+  width: 100%;
+  min-height: 45px;
+}
+.auth-switch {
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.8;
+}
+.auth-device {
+  border-top: 1px solid var(--line);
+  margin-top: 26px;
+  padding-top: 12px;
+  text-align: center;
+}
+@media (max-width: 850px) {
+  .auth-screen {
+    grid-template-columns: 1fr;
+    gap: 22px;
+    margin-top: 0;
+  }
+  .auth-intro {
+    padding-top: 0;
+  }
+  .auth-intro .page-title {
+    max-width: 22ch;
+  }
+  .auth-benefit {
+    display: none;
+  }
+  .workspace-bar {
+    flex-wrap: wrap;
+  }
+}

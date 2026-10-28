@@ -1,7 +1,8 @@
 import { useWorkspace } from "../lib/useWorkspace";
+import { navigate } from "../lib/navigation";
 
 export default function SyncSettings() {
-  const { data, mode, loading, error, refreshedAt, reload, connectServer, startDevice } =
+  const { data, mode, user, loading, error, refreshedAt, reload, connectServer, startDevice } =
     useWorkspace();
   return (
     <section className="screen">
@@ -48,12 +49,14 @@ export default function SyncSettings() {
         <h2>
           {mode === "device"
             ? "This workspace stays on this device."
-            : "Cross-device sync is planned."}
+            : user
+              ? "Your private account workspace."
+              : "Log in to keep your progress."}
         </h2>
         <p className="muted">
           {mode === "device"
             ? "Flows, session history, reflections, and templates are stored in this browser. They are not sent to the study API. Export a backup in Settings before clearing site data or changing devices."
-            : "Online workspaces need account sign-in and shared storage before web and mobile can sync. The classroom CRUD exercises use their own separate workstation databases."}
+            : "Your account saves flows, sessions, and reflections to shared storage. Log in from another browser to load them. Reload to see changes made on another device; automatic live updates are planned."}
         </p>
         <p>
           Switching workspaces does not copy, upload, or delete your device data. Online storage and
@@ -64,12 +67,14 @@ export default function SyncSettings() {
             className="btn ghost"
             disabled={loading}
             onClick={() =>
-              void connectServer().catch(() => {
-                /* Keep device data and show the online error. */
-              })
+              user
+                ? void connectServer().catch(() => {
+                    /* Keep device data and show the online error. */
+                  })
+                : navigate("login")
             }
           >
-            Check online workspace
+            {user ? "Open account workspace" : "Log in to your account"}
           </button>
         ) : (
           <button

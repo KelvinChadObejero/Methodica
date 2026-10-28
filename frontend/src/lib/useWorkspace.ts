@@ -2,6 +2,11 @@ import { createContext, useContext } from "react";
 import type { ReflectionEntry, SessionLog, StudyFlow, StudyType, Workspace } from "../types";
 
 export interface WorkspaceContextValue {
+  user: { id: string; name: string; email: string } | null;
+  accountsAvailable: boolean | null;
+  login: (email: string, password: string) => Promise<void>;
+  register: (name: string, email: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
   data: Workspace | null;
   mode: "server" | "device";
   studyTypes: StudyType[];

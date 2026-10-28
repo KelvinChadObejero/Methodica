@@ -1,6 +1,11 @@
 import { createApp } from "./app.js";
+export { closeAccountServices } from "./auth.js";
 
-const app = createApp();
+const app = createApp(
+  process.env.ALLOW_LOCAL_WORKSPACE === "true" && !process.env.VERCEL
+    ? { dataFile: process.env.DATA_FILE || "data/workspace.json", accounts: null }
+    : {}
+);
 
 // A production Node server must still listen; Vercel imports the exported app.
 if (!process.env.VERCEL) {

@@ -9,6 +9,8 @@ export type Screen =
   | "history"
   | "settings"
   | "timer"
+  | "login"
+  | "register"
   | "crud-demo";
 
 export interface NavEntry {

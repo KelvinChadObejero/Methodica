@@ -1,28 +1,35 @@
 # Vercel deployment verification
 
-The public website is https://methodica-azure.vercel.app. GitHub's Vercel success status confirms that a build was deployed; it does not prove that the deployed API starts or that pages can load their data.
+Public website: https://methodica-azure.vercel.app. A green deployment is only a build result; verify runtime and the study journey separately.
 
-## Runtime entry point
+## Configuration and migrations
 
-The backend service in `vercel.json` builds with `npm run build` and starts from `backend/index.cjs`. That module exports the CommonJS handler bundled into `dist/vercel/index.cjs`. Vercel's runtime logs showed an ESM `app.js` being loaded under a CommonJS package scope (`SyntaxError: Cannot use import statement outside a module`). A single explicitly CommonJS bundle avoids relying on the original package scope when function files are collected. npm dependencies, including Express and CORS, are bundled too: the hosted output folder has no separate node_modules tree for dependency tracing. Only built-in Node modules remain external.
+Backend requires DATABASE_URL and BETTER_AUTH_SECRET. Production BETTER_AUTH_URL is the canonical public origin. Preview uses its exact VERCEL_URL/VERCEL_BRANCH_URL plus the canonical origin. Do not trust every vercel.app origin. Use separate signing secrets for production and preview. Secrets remain server-side; never add a VITE_ prefix.
 
-`npm test` in the backend first compiles/bundles, then imports the exact deployment entry point in a plain Node process with `VERCEL=1`. A second regression test copies the bundle to an `app.js` under a CommonJS package scope, matching the failed deployed layout. These catch runtime import errors that type checking and the local TypeScript development server do not.
+Neon is connected through Vercel. Preview and production currently use the same connected database. Apply only additive, compatible migrations until preview has separate storage. The backend build runs `npm run db:migrate && npm run build`: Prisma applies checked-in migrations using injected credentials, then generates the client and builds. Never run migrate reset in deployment.
 
-Set the backend service's `outputDirectory` to **`dist/vercel`**. The Vercel backend builder scans output folders after a custom build; without this setting it can select `dist/app.js` ahead of the configured root entry point and package that ESM file without the original package scope. The hosted output directory therefore contains only the intended `index.cjs` bundle. The packaging regression also verifies this directory does not contain a competing `app.js`.
+## Runtime package
 
-## Verify a deployment before merging or promoting
+The backend's dedicated output directory is dist/vercel. Its index.cjs is a tiny CommonJS bridge importing server.mjs, a self-contained ESM bundle. Better Auth requires ESM. This also handles Vercel collecting the entry under a CommonJS package scope, which previously caused function startup crashes. npm dependencies are bundled; only Node builtins remain external. Do not point outputDirectory at the wider dist folder, where the builder can select a competing app.js.
 
-1. Confirm GitHub CI succeeds for the exact commit.
-2. Confirm the Vercel preview build succeeds.
-3. Request `/api/health`, `/api/studytypes`, and `/api/preview` on that preview. Each must return HTTP 200 JSON, never a `FUNCTION_INVOCATION_FAILED` response or an HTML page.
-4. With cloud storage unconfigured, `/api/workspace` must return an intentional JSON 503. The frontend must show a recovery panel, keep Settings and the technique catalog available, and offer **Use this device**. It must not leave the main page blank or report a successful cloud save.
-5. Opt into a device workspace. Create a flow, run/save a session, save a reflection, refresh, and reopen history. Verify JSON/CSV export uses device records. Device records must not be sent to a private workspace API endpoint.
-6. Test the production domain again after merge/promotion. Do not infer production behavior only from a local build or green deployment status.
+Backend tests exercise the exact native entry and a collected isolated CommonJS package scope. Account tests also perform registration and authenticated PostgreSQL reads through the compiled deployment bundle, asserting Secure/HttpOnly production cookies.
+
+## Release checklist
+
+1. Confirm CI is green for the exact head; its account suite uses an isolated PostgreSQL 17 service, including concurrent row-lock writes.
+2. Confirm preview migration/build succeeds. Health must report postgresql. Public health, StudyTypes and preview return HTTP 200 JSON; auth/status returns configured=true. Anonymous workspace requests return JSON 401.
+3. Register a test student in the browser. Confirm the account label, fresh workspace, useful validation and no device-data upload.
+4. Create a flow, run/save a session, add a reflection, refresh and inspect history. Log out/in and confirm the same records. Test another account and ensure private records stay separate.
+5. Verify logout/expiry clear private screens, stale tabs cannot write into a changed account, and no plaintext credentials/session tokens appear in localStorage or logs.
+6. Repeat the device journey and export without sending device records to private endpoints. Test login/register on a narrow screen and with keyboard input.
+7. After review and merge, repeat health/auth and browser checks on the production domain. A working preview does not verify production automatically.
+
+When storage/auth is unconfigured, auth/status returns configured=false and private routes return an intentional JSON 503. Forms explain the unavailable service; public catalog and the explicit device workspace remain usable.
 
 ## Storage modes
 
-- **Local API:** one development workspace in the backend file. Not suitable for public multi-user hosting.
-- **Device:** explicit browser storage under `methodica-device-workspace-v1`; mode selection under `methodica-workspace-mode`. Data is private to that browser profile, is not cross-device synced, and is removed by clearing site data. Templates saved to this collection are not public posts. Export a backup first. Corrupt or full browser storage fails visibly and never silently resets existing records.
-- **Hosted accounts/database:** still pending PostgreSQL/Prisma, ownership enforcement, and authentication. Do not enable the file adapter on Vercel or claim device mode implements cloud sync. Existing device/API timer runs use separate session-storage keys to avoid mixing their saves.
+- Account: PostgreSQL/Prisma workspace scoped to the server-verified user, with revocable cookies. Reload on another browser to load saved progress; automatic live updates are planned.
+- Device: explicit localStorage under methodica-device-workspace-v1. It stays separate from accounts and is removed by clearing site data. Export first. Private templates are not public posts.
+- Legacy file: explicit local-only demo/test adapter. Never enabled on Vercel.
 
-Vercel team access is needed to inspect runtime logs and environment-variable names. Confirm whether a database is provisioned and `DATABASE_URL` exists; never paste connection secrets into issues, PR descriptions, or chat. A variable's presence alone does not implement the database adapter.
+Account timers use account-ID sessionStorage keys; device timers use their own key. See [AUTH.md](AUTH.md) for remaining email recovery, role, import and retention work.

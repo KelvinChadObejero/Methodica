@@ -1,10 +1,16 @@
-# Development API contract
+# Study API contract
 
-The existing website uses one Express + TypeScript API. This iteration provides a **local single-workspace adapter**, not the proposal's production account/database implementation. Shared request/result types live in `backend/src/domain.ts` and are imported as types by the frontend. The frontend requests `/api/...`; Vite proxies that prefix to `127.0.0.1:4000`.
+The existing website uses one Express + TypeScript API. Private routes use a verified session and an owner-scoped PostgreSQL workspace; the explicit file adapter remains for local demos/tests. Shared request/result types live in `backend/src/domain.ts` and are imported as types by the frontend. The frontend requests `/api/...`; Vite proxies that prefix to `127.0.0.1:4000`.
+
+## Accounts
+
+Public GET `/api/auth/status` returns `{configured}`. POST `/api/auth/sign-up/email` accepts `{name,email,password}`; POST `/api/auth/sign-in/email` accepts `{email,password}`. GET `/api/auth/get-session` returns the session/user or null. POST `/api/auth/sign-out` revokes it. Authentication uses HttpOnly cookies. Registration requires 12–128 password characters; email recovery is not yet enabled.
+
+All private reads derive ownership from the cookie. Writes require a trusted Origin. Optional X-Methodica-Account must match the verified user; a mismatch returns 401 to prevent stale-tab writes. It never grants access. Another user's IDs return 404 from the scoped workspace. Repeated auth attempts return 429. Public preview/StudyTypes contain no private records.
 
 ## Endpoints
 
-Public endpoints also include `GET /api/preview`, returning `{workspace, studyTypes}` with starter flows/templates and an empty session history. The frontend uses it only to initialize an explicitly selected browser-only workspace. Health, preview and StudyTypes remain available on Vercel without database storage; the private workspace routes below fail closed with JSON 503 until hosted account/storage support exists. Browser-only saves never call those mutation routes.
+Public endpoints also include `GET /api/preview`, returning `{workspace, studyTypes}` with starter flows/templates and an empty session history. The frontend uses it only to initialize an explicitly selected browser-only workspace. Health, preview and StudyTypes remain available on Vercel without database storage; private routes require a session (401 otherwise), or return JSON 503 when storage is unconfigured. Browser-only saves never call those mutation routes.
 
 | Method | Path                        | Behavior                                                                                                                                                   |
 | ------ | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -37,8 +43,8 @@ The timer uses deadlines, advances over delayed ticks, and can pause before a br
 
 Comprehension/fatigue are integers 1–5; notes are text up to 5000 characters. One reflection can be updated per session. The development adapter saves timestamps in ISO form. Dashboard date ranges and streaks use the browser's local calendar days and study time greater than zero; a streak can end today or yesterday. The weekly chart always shows the last seven days, independently of the summary range.
 
-## Storage and production migration
+## Storage and migration
 
-`DATA_FILE` optionally selects an absolute workspace-file path; otherwise it is `data/workspace.json` relative to the backend working directory. Writes use a temporary file and rename; synchronous transactions serialize requests in **one Node process only**. Do not run multiple writers, use a shared network file, or deploy this adapter to a serverless filesystem. Back up the file before manual edits. Development data is ignored by Git.
+Hosted workspaces are PostgreSQL JSON documents keyed by the authenticated user. Transactions lock one account row during mutations, preventing lost updates across function instances. Normalized domain tables remain a follow-up migration. The file adapter runs only when explicitly selected outside Vercel. Device workspaces never send private mutations or silently merge into accounts.
 
-The next implementation should follow proposal sections 7 and 11: PostgreSQL + Prisma migrations, the six entities and their ownership relationships, bcrypt/JWT authentication, authorization, account exports and deletion, and then Socket.IO sync. Add a migration path for local JSON and earlier browser-only sessions. Account-scoped IDs/roles and server-side session verification will replace the trust assumptions of this adapter. See [PROJECT_TODO.md](../PROJECT_TODO.md).
+Prisma migrations are checked in and applied before the Vercel build. Import/deletion policies remain in PROJECT_TODO.md. See [AUTH.md](AUTH.md).
