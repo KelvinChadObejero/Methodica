@@ -16,6 +16,11 @@ function device(): Workspace {
     id: "device-flow",
     title: "Device flow",
   });
+  workspace.templates.unshift({
+    ...structuredClone(workspace.flows[0]),
+    id: "device-template",
+    author: "Device author",
+  });
   workspace.sessions.push({
     id: "device-session",
     flowId: "device-flow",
@@ -43,7 +48,8 @@ test("import preserves existing records, snapshots, browser data and stable IDs"
   const source = device();
   const before = structuredClone(source);
   const planned = planWorkspaceImport(target, validateImportWorkspace(source));
-  assert.deepEqual(planned.summary.added, { flows: 1, sessions: 1, templates: 0 });
+  assert.deepEqual(planned.summary.added, { flows: 1, sessions: 1, templates: 1 });
+  assert.equal(planned.merged.templates[0].author, "Device author");
   assert.equal(planned.summary.reflections, 1);
   assert.equal(planned.summary.existing.flows, 1);
   assert.equal(planned.summary.conflicts.length, 0);

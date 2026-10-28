@@ -208,6 +208,11 @@ test(
         title: "Device study",
       });
       device.flows.push({ ...flow.body, title: "Conflicting browser version" });
+      device.templates.unshift({
+        ...structuredClone(device.flows[0]),
+        id: "device-template",
+        author: "Device author",
+      });
       device.sessions.push({
         ...sessionInput,
         id: "device-session",
@@ -266,6 +271,10 @@ test(
         1
       );
       const retried = await request("/workspace/import", "POST", freshPayload, login.cookie);
+      assert.equal(
+        imports.reduce((sum, result) => sum + result.body.summary.added.templates, 0),
+        1
+      );
       assert.equal(retried.status, 200);
       assert.deepEqual(retried.body.summary.added, { flows: 0, sessions: 0, templates: 0 });
       const imported = (await request("/workspace", "GET", undefined, login.cookie))
@@ -279,6 +288,10 @@ test(
         reflection.notes
       );
       assert.equal(imported.flows.find((item) => item.id === flow.body.id)?.title, flow.body.title);
+      assert.equal(
+        imported.templates.find((item) => item.id === "device-template")?.author,
+        "Device author"
+      );
       assert(
         !(await request("/workspace", "GET", undefined, bobsCookie)).body.sessions.some(
           (session: { id: string }) => session.id === "device-session"
