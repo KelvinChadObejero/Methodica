@@ -2230,6 +2230,66 @@ button:disabled {
   max-width: 60ch;
   margin: 0 auto;
 }
+.device-import {
+  margin-top: 24px;
+}
+.import-review {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+.import-counts {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+.import-counts > div {
+  background: var(--bg);
+  padding: 16px;
+  border-radius: 8px;
+}
+.import-counts dt {
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+.import-counts dd {
+  margin: 8px 0 0;
+  font-size: 24px;
+  font-weight: 600;
+}
+.import-confirm {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin: 24px 0;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.import-confirm input {
+  margin-top: 6px;
+  flex-shrink: 0;
+}
+.device-import details {
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  line-height: 1.7;
+}
+.device-import summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.device-import li {
+  overflow-wrap: anywhere;
+}
+.device-import strong {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 600px) {
+  .import-counts {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
 .account-actions {
   display: flex;
   flex-wrap: wrap;

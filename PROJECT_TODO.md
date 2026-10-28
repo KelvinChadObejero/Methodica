@@ -29,6 +29,8 @@ All of these run locally on the Express development API. None imply that account
 
 ## Account foundation in review
 
+- [x] **IMPORT-01 · Kelvin / partner review:** Implemented; awaiting review — locally review device flows, sessions/reflections and private templates before explicitly copying them to the named account. Preserve browser data and account versions; deduplicate concurrent retries; reject malformed input and stale reviews; test two-account isolation. See [the import guide and Kelvin's test checklist](docs/DEVICE_IMPORT.md). Legacy storage and backup-file uploads remain DB-03 follow-up work.
+
 - [x] **AUTH-01 · Andrei owns / Kelvin reviews:** registration, login/logout, persisted cookie sessions, password confirmation, account screens and expired-session handling. Better Auth uses scrypt/database sessions; see [the proposal adjustment](docs/AUTH.md).
 - [x] **AUTH-02 · Andrei owns / Kelvin reviews:** PostgreSQL/Prisma owner-scoped workspaces, row-lock mutations and tests for two-user access, revocation, expiry, CSRF origins, stale-tab scope and database throttling.
 - [ ] **AUTH-QA · Both:** review the PR, repeat signup → flow → timer → reflection → logout/login on its preview, and confirm production after merge. Device data must stay separate.

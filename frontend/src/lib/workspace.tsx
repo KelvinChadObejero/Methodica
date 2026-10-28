@@ -9,6 +9,7 @@ import type {
 } from "../types";
 import { api, errorMessage, setAccountScope } from "./api";
 import { WorkspaceContext } from "./useWorkspace";
+import type { ImportSummary } from "../../../backend/src/workspace-import";
 import {
   DeviceWorkspace,
   DEVICE_WORKSPACE_KEY,
@@ -230,6 +231,21 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     if (request !== scope.current) throw new Error("Your workspace changed. Please try again.");
   }
 
+  async function importDeviceWorkspace(workspace: Workspace, reviewToken: string) {
+    if (mode !== "server" || !user)
+      throw new Error("Open your account workspace before importing.");
+    const request = scope.current;
+    const result = await api<{ summary: ImportSummary; workspace: Workspace }>(
+      "/workspace/import",
+      "POST",
+      { workspace, reviewToken }
+    );
+    checkScope(request);
+    setData(result.workspace);
+    setRefreshedAt(new Date());
+    return result.summary;
+  }
+
   async function getWorkspace() {
     return mode === "device"
       ? new DeviceWorkspace(localStorage).read().workspace
@@ -373,6 +389,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         startDevice,
         connectServer,
         getWorkspace,
+        importDeviceWorkspace,
         saveFlow,
         deleteFlow,
         saveSession,

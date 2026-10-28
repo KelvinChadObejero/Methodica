@@ -10,6 +10,8 @@ All private reads derive ownership from the cookie. Writes require a trusted Ori
 
 ## Endpoints
 
+`POST /api/workspace/import` accepts `{workspace, reviewToken}` from the explicit device import UI and returns `{summary, workspace}`. It requires a signed-in account, trusted Origin and matching account scope. A SHA-256 review token binds the normalized source, exact target snapshot and account ID. The server checks it again under the account row lock; a changed target returns 409. Matching IDs are skipped, different versions retain the account copy, and exact retries after a completed import are safe no-ops. Import validation/limits reject the whole request. This endpoint accepts at most 8 MB; the other JSON endpoints retain their 256 KB limit. See [DEVICE_IMPORT.md](DEVICE_IMPORT.md).
+
 Public endpoints also include `GET /api/preview`, returning `{workspace, studyTypes}` with starter flows/templates and an empty session history. The frontend uses it only to initialize an explicitly selected browser-only workspace. Health, preview and StudyTypes remain available on Vercel without database storage; private routes require a session (401 otherwise), or return JSON 503 when storage is unconfigured. Browser-only saves never call those mutation routes.
 
 | Method | Path                        | Behavior                                                                                                                                                   |

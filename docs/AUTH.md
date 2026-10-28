@@ -6,7 +6,7 @@ The website supports email/password registration, login, logout, restored sessio
 
 Better Auth owns User, Account, Session, Verification and RateLimit tables. Workspace is a separate document with a unique user ID and a cascading foreign key. The API derives ownership from the verified session, never from a body or account-scope header. Row locks serialize document writes across function instances. Normalized study entities remain DB-01/DB-02 work; current flows and session snapshots keep their API shape.
 
-Registration starts a fresh account workspace. Existing device data stays separate and is never silently uploaded. Device exports remain available; reviewed import/migration is a later task. Saved templates are private copies, not public community posts.
+Registration starts a fresh account workspace. Existing device data stays separate and is never silently uploaded. Users can explicitly review and copy the current browser workspace from Workspace Connection; see [DEVICE_IMPORT.md](DEVICE_IMPORT.md). Device exports remain available, while backup-file and legacy migrations remain follow-up work. Saved templates are private copies, not public community posts.
 
 ## Browser and session behavior
 

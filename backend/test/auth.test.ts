@@ -9,6 +9,9 @@ import { startPrismaDevServer } from "@prisma/dev";
 import { createApp } from "../src/app.js";
 import { createDatabase } from "../src/database.js";
 import { createAuthentication } from "../src/auth.js";
+import { reviewWorkspaceImport } from "../src/workspace-import.js";
+import { initialWorkspace } from "../src/seed.js";
+import type { Workspace } from "../src/domain.js";
 
 test(
   "accounts persist, revoke sessions and isolate every workspace route",
@@ -198,6 +201,89 @@ test(
       assert.equal(restored.body.sessions[0].reflection.notes, reflection.notes);
       const me = await request("/auth/get-session", "GET", undefined, login.cookie);
       assert.equal(me.body.user.email, alice.email);
+      const device = initialWorkspace();
+      device.flows.unshift({
+        ...structuredClone(device.flows[0]),
+        id: "device-flow",
+        title: "Device study",
+      });
+      device.flows.push({ ...flow.body, title: "Conflicting browser version" });
+      device.sessions.push({
+        ...sessionInput,
+        id: "device-session",
+        flowId: "device-flow",
+        hasReflection: true,
+        reflection: { ...reflection, sessionTitle: "Device study", sessionSubtitle: "Biology" },
+      });
+      const beforeImport = (await request("/workspace", "GET", undefined, login.cookie))
+        .body as Workspace;
+      const reviewed = await reviewWorkspaceImport(beforeImport, device, signedUp.body.user.id);
+      const payload = { workspace: device, reviewToken: reviewed.token };
+      assert.equal((await request("/workspace/import", "POST", payload)).status, 401);
+      assert.equal(
+        (
+          await request(
+            "/workspace/import",
+            "POST",
+            payload,
+            login.cookie,
+            "https://untrusted.example"
+          )
+        ).status,
+        403
+      );
+      assert.equal((await request("/workspace/import", "POST", payload, bobsCookie)).status, 409);
+      assert.equal(
+        (
+          await request(
+            "/workspace/import",
+            "POST",
+            { ...payload, workspace: { ...device, sessions: [null] } },
+            login.cookie
+          )
+        ).status,
+        400
+      );
+      assert.deepEqual(
+        (await request("/workspace", "GET", undefined, login.cookie)).body,
+        beforeImport
+      );
+      await request("/flows", "POST", { ...flowInput, title: "New account change" }, login.cookie);
+      assert.equal((await request("/workspace/import", "POST", payload, login.cookie)).status, 409);
+      const current = (await request("/workspace", "GET", undefined, login.cookie))
+        .body as Workspace;
+      const freshReview = await reviewWorkspaceImport(current, device, signedUp.body.user.id);
+      const freshPayload = { workspace: device, reviewToken: freshReview.token };
+      const imports = await Promise.all(
+        [0, 1].map(() => request("/workspace/import", "POST", freshPayload, login.cookie))
+      );
+      assert(
+        imports.every((result) => result.status === 200),
+        JSON.stringify(imports.map((result) => result.body))
+      );
+      assert.equal(
+        imports.reduce((sum, result) => sum + result.body.summary.added.sessions, 0),
+        1
+      );
+      const retried = await request("/workspace/import", "POST", freshPayload, login.cookie);
+      assert.equal(retried.status, 200);
+      assert.deepEqual(retried.body.summary.added, { flows: 0, sessions: 0, templates: 0 });
+      const imported = (await request("/workspace", "GET", undefined, login.cookie))
+        .body as Workspace;
+      assert.equal(
+        imported.sessions.filter((session) => session.id === "device-session").length,
+        1
+      );
+      assert.equal(
+        imported.sessions.find((session) => session.id === "device-session")?.reflection?.notes,
+        reflection.notes
+      );
+      assert.equal(imported.flows.find((item) => item.id === flow.body.id)?.title, flow.body.title);
+      assert(
+        !(await request("/workspace", "GET", undefined, bobsCookie)).body.sessions.some(
+          (session: { id: string }) => session.id === "device-session"
+        )
+      );
       await db.session.updateMany({
         where: { userId: signedUp.body.user.id },
         data: { expiresAt: new Date(0) },

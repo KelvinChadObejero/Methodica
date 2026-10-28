@@ -27,6 +27,7 @@ Open http://localhost:5173. Vite proxies `/api` to `127.0.0.1:4000`; both proces
 ## What works in this development version
 
 - Accounts: email/password registration, login/logout, restored sessions and private PostgreSQL workspaces.
+- Device import: review and explicitly copy browser flows, sessions/reflections and private templates into an account without clearing local data or overwriting account records. See [the import guide](docs/DEVICE_IMPORT.md).
 - Flow library: create, rename, edit, delete, add/remove/reorder blocks, calculate duration.
 - Technique toolkit and starter templates; import a template into the library and publish a saved flow to the local collection.
 - Timer using saved flows, pause/resume, skip, actual elapsed study time, and recovery after refresh in the same tab.

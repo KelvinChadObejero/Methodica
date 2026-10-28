@@ -1,5 +1,6 @@
 import { createContext, useContext } from "react";
 import type { ReflectionEntry, SessionLog, StudyFlow, StudyType, Workspace } from "../types";
+import type { ImportSummary } from "../../../backend/src/workspace-import";
 
 export interface WorkspaceContextValue {
   user: { id: string; name: string; email: string } | null;
@@ -17,6 +18,7 @@ export interface WorkspaceContextValue {
   startDevice: () => Promise<void>;
   connectServer: () => Promise<void>;
   getWorkspace: () => Promise<Workspace>;
+  importDeviceWorkspace: (workspace: Workspace, reviewToken: string) => Promise<ImportSummary>;
   saveFlow: (flow: StudyFlow, isNew: boolean) => Promise<StudyFlow>;
   deleteFlow: (id: string) => Promise<void>;
   saveSession: (session: Omit<SessionLog, "hasReflection" | "reflection">) => Promise<SessionLog>;
