@@ -19,7 +19,8 @@ test("the configured Vercel entry point runs in native Node without a TS loader"
   const script = `
     process.env.VERCEL = "1";
     const app = (await import(${JSON.stringify(entry)})).default;
-    const server = app.listen(0, "127.0.0.1");
+    const { createServer } = await import("node:http");
+    const server = createServer(app).listen(0, "127.0.0.1");
     await new Promise(done => server.once("listening", done));
     try {
       const base = "http://127.0.0.1:" + server.address().port;
@@ -55,12 +56,17 @@ test("the deployed bundle still starts when collected under a CommonJS package s
     const config = JSON.parse(readFileSync(new URL("../../vercel.json", import.meta.url), "utf8"));
     const output = config.services.backend.outputDirectory;
     assert.equal(output, "dist/vercel");
-    assert.deepEqual(readdirSync(fileURLToPath(new URL(`../${output}`, import.meta.url))), [
+    assert.deepEqual(readdirSync(fileURLToPath(new URL(`../${output}`, import.meta.url))).sort(), [
       "index.cjs",
+      "server.mjs",
     ]);
     copyFileSync(fileURLToPath(new URL(`../${output}/index.cjs`, import.meta.url)), collected);
+    copyFileSync(
+      fileURLToPath(new URL(`../${output}/server.mjs`, import.meta.url)),
+      join(directory, "server.mjs")
+    );
     const entry = pathToFileURL(collected).href;
-    const script = `process.env.VERCEL = "1"; const app = (await import(${JSON.stringify(entry)})).default; if (typeof app !== "function") throw new Error("No Express handler exported"); console.log("handler-ready");`;
+    const script = `process.env.VERCEL = "1"; const app = (await import(${JSON.stringify(entry)})).default; const { createServer } = await import("node:http"); const server = createServer(app).listen(0, "127.0.0.1"); await new Promise(done => server.once("listening", done)); try { const response = await fetch("http://127.0.0.1:" + server.address().port + "/api/health"); if (response.status !== 200) throw new Error("Bundle did not start"); console.log("handler-ready"); } finally { await new Promise(done => server.close(done)); }`;
     const result = execFileSync(process.execPath, ["--input-type=module", "-e", script], {
       cwd: directory,
       encoding: "utf8",

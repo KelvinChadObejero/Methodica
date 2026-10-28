@@ -1,9 +1,18 @@
+let accountId: string | null = null;
+export function setAccountScope(id: string | null) {
+  accountId = id;
+}
+
 export async function api<T>(path: string, method = "GET", body?: unknown): Promise<T> {
   let response: Response;
   try {
     response = await fetch(`/api${path}`, {
       method,
-      headers: body === undefined ? undefined : { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      headers: {
+        ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+        ...(accountId && !path.startsWith("/auth/") ? { "X-Methodica-Account": accountId } : {}),
+      },
       body: body === undefined ? undefined : JSON.stringify(body),
       signal: AbortSignal.timeout(15000),
     });
@@ -11,6 +20,8 @@ export async function api<T>(path: string, method = "GET", body?: unknown): Prom
     throw new Error("Could not reach the study service. Check your connection and try again.");
   }
   if (!response.ok) {
+    if (response.status === 401 && !path.startsWith("/auth/"))
+      window.dispatchEvent(new Event("methodica-session-expired"));
     const error = await response.json().catch(() => null);
     throw new Error(
       response.status === 503

@@ -6,3 +6,5 @@ dist
 .DS_Store
 /tmp/
 /backend/data/
+/backend/src/generated/
+/.vercel/

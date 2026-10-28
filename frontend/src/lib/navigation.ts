@@ -10,6 +10,8 @@ const screens: Screen[] = [
   "history",
   "settings",
   "timer",
+  "login",
+  "register",
   "crud-demo",
 ];
 export function currentScreen(): Screen {

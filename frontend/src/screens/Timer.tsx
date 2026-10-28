@@ -22,8 +22,9 @@ function timeLabel(ms: number) {
 }
 
 export default function Timer() {
-  const { data, studyTypes, mode, saveSession } = useWorkspace();
-  const storageKey = mode === "device" ? "methodica-device-active-timer" : "methodica-active-timer";
+  const { data, studyTypes, mode, user, saveSession } = useWorkspace();
+  const storageKey =
+    mode === "device" ? "methodica-device-active-timer" : `methodica-account-timer-${user?.id}`;
   const [run, setRun] = useState<TimerRun | null>(
     () => restoreRun(storageKey) || (data?.flows[0] ? newRun(data.flows[0]) : null)
   );

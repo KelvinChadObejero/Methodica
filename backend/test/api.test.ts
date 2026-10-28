@@ -10,7 +10,7 @@ import type { SessionLog, StudyFlow, StudyFlowTemplate, Workspace } from "../src
 test("hosted workspace requests fail clearly until durable storage is configured", async () => {
   const previous = process.env.VERCEL;
   process.env.VERCEL = "1";
-  const server = createApp().listen(0, "127.0.0.1");
+  const server = createApp({ accounts: null }).listen(0, "127.0.0.1");
   try {
     await once(server, "listening");
     const address = server.address();

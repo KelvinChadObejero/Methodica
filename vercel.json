@@ -4,7 +4,7 @@
     "backend": {
       "root": "backend",
       "framework": "express",
-      "buildCommand": "npm run build",
+      "buildCommand": "npm run db:migrate && npm run build",
       "outputDirectory": "dist/vercel",
       "entrypoint": "index.cjs"
     },
