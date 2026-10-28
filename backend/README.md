@@ -14,7 +14,7 @@ The old unauthenticated file adapter requires ALLOW_LOCAL_WORKSPACE=true outside
 
 Registration signs in immediately. Better Auth normalizes emails and hashes passwords with scrypt; passwords require 12–128 characters. Revocable seven-day sessions use HttpOnly, SameSite=Lax cookies, Secure on hosted HTTPS. Database-backed throttling limits login and registration across function instances. Private writes validate Origin; ownership always comes from the session. Workspace documents use PostgreSQL JSON with row locks for concurrent updates.
 
-Email verification/reset, mentor roles, normalized study tables, device imports and automatic live synchronization remain follow-up work. See [AUTH.md](../docs/AUTH.md) and [API.md](../docs/API.md).
+Device workspaces can be explicitly reviewed and copied into accounts without overwriting existing records or clearing browser data; see [the import guide](../docs/DEVICE_IMPORT.md). Email verification/reset, mentor roles, normalized study tables, backup-file/legacy imports and automatic live synchronization remain follow-up work. See [AUTH.md](../docs/AUTH.md) and [API.md](../docs/API.md).
 
 ## Deployment
 

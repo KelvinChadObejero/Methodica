@@ -8,6 +8,13 @@ import type { SessionLog, StudyBlock, StudyFlow } from "./domain.js";
 import { fromNodeHeaders, toNodeHandler } from "better-auth/node";
 import { accountServices, type AccountServices } from "./auth.js";
 import { AccountWorkspace, type WorkspaceStore } from "./database.js";
+import {
+  canonical,
+  hasImportAdditions,
+  planWorkspaceImport,
+  reviewWorkspaceImport,
+  WorkspaceImportError,
+} from "./workspace-import.js";
 
 class HttpError extends Error {
   constructor(
@@ -115,14 +122,13 @@ export function createApp(options: { dataFile?: string; accounts?: AccountServic
     accounts
       ? handle(toNodeHandler(accounts.auth))
       : (_req, res) => {
-          res
-            .status(503)
-            .json({
-              message:
-                "Account registration and login need database configuration. Your device workspace remains available.",
-            });
+          res.status(503).json({
+            message:
+              "Account registration and login need database configuration. Your device workspace remains available.",
+          });
         }
   );
+  app.post("/api/workspace/import", express.json({ limit: "8mb" }));
   app.use(express.json({ limit: "256kb" }));
   // These endpoints contain only the public catalog and starter content. They
   // remain available without a database; private workspace routes fail closed.
@@ -150,6 +156,7 @@ export function createApp(options: { dataFile?: string; accounts?: AccountServic
         )
           throw new HttpError(403, "This request did not come from your Methodica workspace.");
         res.locals.store = new AccountWorkspace(accounts.db, session.user.id);
+        res.locals.accountId = session.user.id;
       } else if (options.dataFile && !process.env.VERCEL) {
         // Explicit local test/development adapter; never exposed by a hosted deployment.
         res.locals.store = localStore;
@@ -162,6 +169,40 @@ export function createApp(options: { dataFile?: string; accounts?: AccountServic
     "/api/workspace",
     handle(async (_req, res) => {
       res.json(await storeFor(res).read());
+    })
+  );
+  app.post(
+    "/api/workspace/import",
+    handle(async (req, res) => {
+      if (!res.locals.accountId)
+        throw new HttpError(403, "Log in to an account before importing device data.");
+      const input = object(req.body);
+      const token = text(input.reviewToken, "Import review", 64);
+      if (!/^[a-f0-9]{64}$/.test(token))
+        throw new HttpError(400, "Review the device data before importing.");
+      const store = storeFor(res);
+      const before = await store.read();
+      const review = await reviewWorkspaceImport(before, input.workspace, res.locals.accountId);
+      // An exact retry after a lost success response is a safe no-op.
+      if (hasImportAdditions(review) && token !== review.token)
+        throw new HttpError(
+          409,
+          "Your account or device data changed since this review. Review the import again; nothing was copied."
+        );
+      const snapshot = canonical(before);
+      const result = await store.update((data) => {
+        const plan = planWorkspaceImport(data, review.source);
+        if (hasImportAdditions(plan.summary) && canonical(data) !== snapshot)
+          throw new HttpError(
+            409,
+            "Your account changed while importing. Review again; nothing was copied."
+          );
+        data.flows = plan.merged.flows;
+        data.sessions = plan.merged.sessions;
+        data.templates = plan.merged.templates;
+        return { summary: plan.summary, workspace: data };
+      });
+      res.json(result);
     })
   );
   app.get(
@@ -342,7 +383,8 @@ export function createApp(options: { dataFile?: string; accounts?: AccountServic
   );
   app.use((_req, _res, next) => next(new HttpError(404, "Endpoint not found.")));
   const onError: ErrorRequestHandler = (error: unknown, _req, res, _next) => {
-    if (error instanceof HttpError) res.status(error.status).json({ message: error.message });
+    if (error instanceof HttpError || error instanceof WorkspaceImportError)
+      res.status(error.status).json({ message: error.message });
     else if (error instanceof SyntaxError && "body" in error)
       res.status(400).json({ message: "Invalid JSON body." });
     else if (
