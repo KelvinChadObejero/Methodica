@@ -2,6 +2,8 @@ import express, { type ErrorRequestHandler, type RequestHandler } from "express"
 import cors from "cors";
 import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import { FileStore } from "./store.js";
 import { initialWorkspace, studyTypes } from "./seed.js";
 import type { SessionLog, StudyBlock, StudyFlow } from "./domain.js";
@@ -9,6 +11,7 @@ import { fromNodeHeaders, toNodeHandler } from "better-auth/node";
 import { accountServices, type AccountServices } from "./auth.js";
 import { AccountWorkspace, type WorkspaceStore } from "./database.js";
 import {
+  validateStudyBlocks,
   canonical,
   MAX_IMPORT_BYTES,
   hasImportAdditions,
@@ -16,6 +19,10 @@ import {
   reviewWorkspaceImport,
   WorkspaceImportError,
 } from "./workspace-import.js";
+
+import { historyQuery, historyPage } from "./history.js";
+import { reportQuery, studyReport, inReport } from "./reporting.js";
+import { sessionsCsv } from "./csv.js";
 
 class HttpError extends Error {
   constructor(
@@ -30,6 +37,18 @@ function object(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value))
     throw new HttpError(400, "Expected a JSON object.");
   return value as Record<string, unknown>;
+}
+
+// Explicit backups/reports may exceed a buffered function response. No headers
+// are sent until the complete database read and validation have succeeded.
+async function streamJson(res: express.Response, value: unknown) {
+  const bytes = Buffer.from(JSON.stringify(value));
+  function* chunks() {
+    for (let offset = 0; offset < bytes.length; offset += 16384)
+      yield bytes.subarray(offset, offset + 16384);
+  }
+  res.type("application/json");
+  await pipeline(Readable.from(chunks()), res);
 }
 
 function text(value: unknown, label: string, max = 120): string {
@@ -169,7 +188,66 @@ export function createApp(options: { dataFile?: string; accounts?: AccountServic
   app.get(
     "/api/workspace",
     handle(async (_req, res) => {
-      res.json(await storeFor(res).read());
+      await streamJson(res, await storeFor(res).read());
+    })
+  );
+  app.get(
+    "/api/workspace/overview",
+    handle(async (_req, res) => {
+      const store = storeFor(res);
+      const data = store instanceof AccountWorkspace ? await store.overview() : await store.read();
+      res.json({ ...data, sessions: data.sessions.slice(0, 25) });
+    })
+  );
+  app.get(
+    "/api/sessions/page",
+    handle(async (req, res) => {
+      const query = historyQuery(new URL(req.originalUrl, "http://localhost").searchParams);
+      const store = storeFor(res);
+      res.json(
+        store instanceof AccountWorkspace
+          ? await store.history(query)
+          : historyPage((await store.read()).sessions, query)
+      );
+    })
+  );
+  app.get(
+    "/api/sessions/:id",
+    handle(async (req, res) => {
+      const store = storeFor(res);
+      const session =
+        store instanceof AccountWorkspace
+          ? await store.session(req.params.id)
+          : (await store.read()).sessions.find((s) => s.id === req.params.id);
+      if (!session) throw new HttpError(404, "Session not found.");
+      res.json(session);
+    })
+  );
+  app.get(
+    "/api/reports/summary",
+    handle(async (req, res) => {
+      const query = reportQuery(new URL(req.originalUrl, "http://localhost").searchParams);
+      const store = storeFor(res);
+      res.json(
+        store instanceof AccountWorkspace
+          ? await store.report(query)
+          : studyReport((await store.read()).sessions, query)
+      );
+    })
+  );
+  app.get(
+    "/api/reports/sessions",
+    handle(async (req, res) => {
+      const params = new URL(req.originalUrl, "http://localhost").searchParams;
+      const query = reportQuery(params);
+      if (!params.has("until") || !/^\d+$/.test(params.get("revision") || ""))
+        throw new HttpError(400, "Refresh the report before exporting.");
+      const store = storeFor(res);
+      const sessions =
+        store instanceof AccountWorkspace
+          ? await store.reportSessions(query, Number(params.get("revision")))
+          : (await store.read()).sessions.filter((s) => inReport(s, query));
+      await streamJson(res, { csv: sessionsCsv(sessions) });
     })
   );
   app.post(
@@ -203,7 +281,7 @@ export function createApp(options: { dataFile?: string; accounts?: AccountServic
         data.templates = plan.merged.templates;
         return { summary: plan.summary, workspace: data };
       });
-      res.json(result);
+      await streamJson(res, result);
     })
   );
   app.get(
@@ -254,7 +332,7 @@ export function createApp(options: { dataFile?: string; accounts?: AccountServic
   app.get(
     "/api/sessions",
     handle(async (_req, res) => {
-      res.json((await storeFor(res).read()).sessions);
+      await streamJson(res, (await storeFor(res).read()).sessions);
     })
   );
   app.post(
@@ -276,11 +354,15 @@ export function createApp(options: { dataFile?: string; accounts?: AccountServic
       const flowTitle = text(input.flowTitle, "Flow title");
       const flowTag = text(input.flowTag, "Flow subject", 60);
       const subject = text(input.subject, "Subject", 60);
+      const blocks = input.blocks === undefined ? undefined : validateStudyBlocks(input.blocks);
       let created = false;
       const session = await storeFor(res).update((data) => {
         const existing = data.sessions.find((item) => item.id === id);
         if (existing) {
           if (
+            (blocks !== undefined &&
+              existing.blocks !== undefined &&
+              canonical(blocks) !== canonical(existing.blocks)) ||
             existing.flowId !== flowId ||
             existing.startedAt !== new Date(started).toISOString() ||
             existing.durationMinutes !== durationMinutes ||
@@ -308,6 +390,7 @@ export function createApp(options: { dataFile?: string; accounts?: AccountServic
           durationMinutes,
           focusMinutes,
           status: input.status as SessionLog["status"],
+          ...(blocks ? { blocks } : {}),
           hasReflection: false,
         };
         data.sessions.unshift(entry);
@@ -384,6 +467,10 @@ export function createApp(options: { dataFile?: string; accounts?: AccountServic
   );
   app.use((_req, _res, next) => next(new HttpError(404, "Endpoint not found.")));
   const onError: ErrorRequestHandler = (error: unknown, _req, res, _next) => {
+    if (res.headersSent) {
+      _next(error);
+      return;
+    }
     if (error instanceof HttpError || error instanceof WorkspaceImportError)
       res.status(error.status).json({ message: error.message });
     else if (error instanceof SyntaxError && "body" in error)

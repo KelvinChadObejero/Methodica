@@ -26,8 +26,9 @@ erDiagram
 
 Imported templates are independent snapshots. `sourceTemplateId` records provenance
 without linking future edits or deletion. Templates remain private until S2-02.
-Session block snapshots and execution events remain M4-02/M5-02 work; old records
-do not invent missing historical block details. Mentor/admin access still needs
+Session blocks are immutable planned snapshots on new records; old records
+omit missing details. Block execution events remain M4-02 work. See
+[history and report queries](HISTORY_REPORTS.md). Mentor/admin access still needs
 an explicit permission design.
 
 ## Migration and rollback
@@ -49,6 +50,10 @@ and production still share a database. Do not remove the mirror or rename/drop
 columns until preview storage is separate, a backup has been restored in a test,
 and all deployed writers use the new adapter. A provider backup and restore drill
 remain OPS-01; the mirror is not a backup.
+
+The history migration adds nullable session block JSON, an owner/date/ID index,
+and workspace revision/normalization markers for bounded reads. Older serializers
+cannot erase known optional snapshots for an unchanged session core.
 
 ## Fresh setup and verification
 

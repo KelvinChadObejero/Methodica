@@ -31,6 +31,7 @@ test("device flows, sessions and reflections survive a new store without an API"
     startedAt: new Date(Date.now() - 60000).toISOString(),
     durationMinutes: 1,
     focusMinutes: 1,
+    blocks: flow.blocks,
     status: "completed" as const,
   };
   store.saveSession(input);
@@ -43,6 +44,7 @@ test("device flows, sessions and reflections survive a new store without an API"
   store.deleteFlow(flow.id);
   const restored = new DeviceWorkspace(storage).read();
   assert.equal(restored.workspace.sessions.length, 1);
+  assert.deepEqual(restored.workspace.sessions[0].blocks, flow.blocks);
   assert.equal(restored.workspace.sessions[0].reflection?.notes, "Recall exposed a gap.");
   assert(restored.workspace.templates.some((template) => template.id === `published-${flow.id}`));
   assert.equal(storage.values.get("unrelated-app"), "leave this alone");

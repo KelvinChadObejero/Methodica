@@ -113,6 +113,7 @@ export default function Timer() {
           flowTag: completed.flow.tag,
           startedAt: completed.startedAt,
           subject: completed.flow.tag,
+          blocks: completed.flow.blocks,
           durationMinutes,
           focusMinutes: Math.min(durationMinutes, Math.floor(completed.focusMs / 1000) / 60),
           status: completed.skipped ? "stopped" : "completed",

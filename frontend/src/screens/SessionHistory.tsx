@@ -1,25 +1,49 @@
-import { useState } from "react";
+import type { HistoryPage } from "../../../backend/src/history";
+import { errorMessage } from "../lib/api";
+import { useEffect, useState } from "react";
 import { useWorkspace } from "../lib/useWorkspace";
 import { navigate } from "../lib/navigation";
 import { dayKey } from "../lib/analytics";
-
 export default function SessionHistory() {
-  const { data } = useWorkspace();
+  const { data, getHistory } = useWorkspace();
   const [query, setQuery] = useState("");
   const [subject, setSubject] = useState("");
   const [withReflection, setWithReflection] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
-  const subjects = [...new Set(data?.sessions.map((session) => session.subject) || [])].sort();
-  const sessions = [...(data?.sessions || [])]
-    .filter(
-      (session) =>
-        (!subject || session.subject === subject) &&
-        (!withReflection || session.hasReflection) &&
-        `${session.flowTitle} ${session.subject} ${session.reflection?.notes || ""}`
-          .toLowerCase()
-          .includes(query.trim().toLowerCase())
-    )
-    .sort((a, b) => Date.parse(b.startedAt) - Date.parse(a.startedAt));
+  const [page, setPage] = useState<HistoryPage | null>(null);
+  const [offset, setOffset] = useState(0);
+  const [revision, setRevision] = useState<number | undefined>();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [retry, setRetry] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError("");
+    const timer = window.setTimeout(() => {
+      void getHistory({ q: query, subject, reflected: withReflection, offset, limit: 25, revision })
+        .then((result) => {
+          if (!cancelled) setPage(result);
+        })
+        .catch((cause) => {
+          if (!cancelled) setError(errorMessage(cause));
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false);
+        });
+    }, 150);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [getHistory, data, query, subject, withReflection, offset, revision, retry]);
+  function resetPage() {
+    setOffset(0);
+    setRevision(undefined);
+    setExpanded(null);
+  }
+  const subjects = page?.subjects || [];
+  const sessions = loading || error ? [] : page?.items || [];
   const groups = new Map<string, typeof sessions>();
   for (const session of sessions) {
     const key = dayKey(new Date(session.startedAt));
@@ -51,13 +75,23 @@ export default function SessionHistory() {
           <input
             className="search"
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            maxLength={120}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              resetPage();
+            }}
             placeholder="Search flows, subjects, or notes"
           />
         </label>
         <label>
           Subject
-          <select value={subject} onChange={(event) => setSubject(event.target.value)}>
+          <select
+            value={subject}
+            onChange={(event) => {
+              setSubject(event.target.value);
+              resetPage();
+            }}
+          >
             <option value="">All subjects</option>
             {subjects.map((item) => (
               <option key={item} value={item}>
@@ -70,12 +104,30 @@ export default function SessionHistory() {
           <input
             type="checkbox"
             checked={withReflection}
-            onChange={(event) => setWithReflection(event.target.checked)}
+            onChange={(event) => {
+              setWithReflection(event.target.checked);
+              resetPage();
+            }}
           />
           With reflection
         </label>
       </div>
-      {!sessions.length && (
+      {loading && <p role="status">Loading sessions…</p>}
+      {error && (
+        <div className="card" role="alert">
+          <p>{error}</p>
+          <button
+            className="btn ghost"
+            onClick={() => {
+              resetPage();
+              setRetry((v) => v + 1);
+            }}
+          >
+            Reload history
+          </button>
+        </div>
+      )}
+      {!loading && !error && !sessions.length && (
         <div className="card empty-state">
           <h2>{data?.sessions.length ? "No sessions match." : "Your story starts here."}</h2>
           <p>
@@ -87,6 +139,7 @@ export default function SessionHistory() {
             className="btn ghost"
             onClick={() => {
               if (data?.sessions.length) {
+                resetPage();
                 setQuery("");
                 setSubject("");
                 setWithReflection(false);
@@ -96,6 +149,11 @@ export default function SessionHistory() {
             {data?.sessions.length ? "Clear filters" : "Open study timer"}
           </button>
         </div>
+      )}
+      {!loading && !error && !!page?.total && (
+        <p className="muted" role="status">
+          Showing {offset + 1}–{offset + sessions.length} of {page.total} sessions
+        </p>
       )}
       <div className="sessions-list">
         {Array.from(groups.entries()).map(([day, entries]) => (
@@ -141,6 +199,20 @@ export default function SessionHistory() {
                       : `${session.focusMinutes.toFixed(1)} min studying`}
                   </span>
                 </div>
+                {session.blocks ? (
+                  <details className="snapshot-detail">
+                    <summary>Flow at session start</summary>
+                    <ol>
+                      {session.blocks.map((block) => (
+                        <li key={block.id}>
+                          {block.title} · {block.type} · {block.durationMinutes} min planned
+                        </li>
+                      ))}
+                    </ol>
+                  </details>
+                ) : (
+                  <p className="muted">Block details were not recorded for this older session.</p>
+                )}
                 <div className="inline-actions">
                   {session.reflection && (
                     <button
@@ -173,6 +245,37 @@ export default function SessionHistory() {
           </div>
         ))}
       </div>
+      {!loading && !error && page && (
+        <nav className="inline-actions" aria-label="History pages">
+          <button
+            className="btn ghost"
+            disabled={!offset}
+            onClick={() => {
+              setOffset(Math.max(0, offset - 25));
+              setRevision(page.revision);
+              setExpanded(null);
+            }}
+          >
+            Previous page
+          </button>
+          <button
+            className="btn ghost"
+            disabled={page.nextOffset === null}
+            onClick={() => {
+              setOffset(page.nextOffset!);
+              setRevision(page.revision);
+              setExpanded(null);
+            }}
+          >
+            Next page
+          </button>
+          {offset > 0 && (
+            <button className="text-button" onClick={resetPage}>
+              First page
+            </button>
+          )}
+        </nav>
+      )}
     </section>
   );
 }

@@ -1,9 +1,18 @@
 import { PrismaPg } from "@prisma/adapter-pg";
 import { createHash } from "node:crypto";
-import { PrismaClient, type Prisma } from "./generated/prisma/client.js";
-import type { SessionLog, StudyFlow, StudyFlowTemplate, Workspace } from "./domain.js";
+import { PrismaClient, Prisma } from "./generated/prisma/client.js";
+import type { StudyBlock, SessionLog, StudyFlow, StudyFlowTemplate, Workspace } from "./domain.js";
 import { initialWorkspace, studyTypes } from "./seed.js";
-import { canonical } from "./workspace-import.js";
+import { canonical, WorkspaceImportError } from "./workspace-import.js";
+
+import type { HistoryQuery, HistoryPage } from "./history.js";
+import {
+  dateKey,
+  reportDaily,
+  streakFor,
+  type ReportQuery,
+  type StudyReport,
+} from "./reporting.js";
 
 export interface WorkspaceStore {
   read(): Promise<Workspace>;
@@ -42,7 +51,7 @@ function digest(data: Workspace) {
   return createHash("sha256").update(canonical(data)).digest("hex");
 }
 
-async function readStudyData(tx: Transaction, userId: string): Promise<Workspace> {
+async function readStudyData(tx: Transaction, userId: string, recent?: number): Promise<Workspace> {
   const flows = await tx.studyFlow.findMany({
     where: { userId },
     orderBy: [{ position: "asc" }, { id: "asc" }],
@@ -50,7 +59,10 @@ async function readStudyData(tx: Transaction, userId: string): Promise<Workspace
   });
   const sessions = await tx.studySession.findMany({
     where: { userId },
-    orderBy: [{ position: "asc" }, { id: "asc" }],
+    orderBy: recent
+      ? [{ startedAt: "desc" }, { id: "desc" }]
+      : [{ position: "asc" }, { id: "asc" }],
+    ...(recent ? { take: recent } : {}),
     include: { log: true },
   });
   function flow(row: (typeof flows)[number]): StudyFlow {
@@ -75,32 +87,37 @@ async function readStudyData(tx: Transaction, userId: string): Promise<Workspace
     templates: flows
       .filter((row) => row.kind === "template")
       .map((row) => ({ ...flow(row), author: row.author! })),
-    sessions: sessions.map((row) => ({
-      id: row.id,
-      flowId: row.flowId,
-      flowTitle: row.flowTitle,
-      flowTag: row.flowTag,
-      startedAt: row.startedAt.toISOString(),
-      durationMinutes: row.durationMinutes,
-      focusMinutes: row.focusMinutes,
-      subject: row.subject,
-      status: row.status,
-      ...(row.timingSource === "legacy-estimate"
-        ? { timingSource: "legacy-estimate" as const }
-        : {}),
-      hasReflection: row.log !== null,
-      ...(row.log
-        ? {
-            reflection: {
-              sessionTitle: row.log.sessionTitle,
-              sessionSubtitle: row.log.sessionSubtitle,
-              comprehension: row.log.comprehension,
-              fatigue: row.log.fatigue,
-              notes: row.log.notes,
-            },
-          }
-        : {}),
-    })),
+    sessions: sessions.map(sessionFromRow),
+  };
+}
+
+function sessionFromRow(
+  row: Prisma.StudySessionGetPayload<{ include: { log: true } }>
+): SessionLog {
+  return {
+    id: row.id,
+    flowId: row.flowId,
+    flowTitle: row.flowTitle,
+    flowTag: row.flowTag,
+    startedAt: row.startedAt.toISOString(),
+    durationMinutes: row.durationMinutes,
+    focusMinutes: row.focusMinutes,
+    subject: row.subject,
+    status: row.status,
+    ...(row.timingSource === "legacy-estimate" ? { timingSource: "legacy-estimate" as const } : {}),
+    ...(row.blocks === null ? {} : { blocks: row.blocks as unknown as StudyBlock[] }),
+    hasReflection: row.log !== null,
+    ...(row.log
+      ? {
+          reflection: {
+            sessionTitle: row.log.sessionTitle,
+            sessionSubtitle: row.log.sessionSubtitle,
+            comprehension: row.log.comprehension,
+            fatigue: row.log.fatigue,
+            notes: row.log.notes,
+          },
+        }
+      : {}),
   };
 }
 
@@ -117,6 +134,7 @@ function sessionRecord(session: SessionLog, position: number) {
     subject: session.subject,
     status: session.status,
     timingSource: session.timingSource ?? null,
+    blocks: session.blocks ? (session.blocks as unknown as Prisma.InputJsonValue) : Prisma.DbNull,
   };
 }
 
@@ -226,8 +244,13 @@ async function writeStudyData(
     previous.sessions.map((session, position) => [session.id, { session, position }])
   );
   const shifts = new Map<number, string[]>();
+  const additions: { session: SessionLog; position: number }[] = [];
   for (const [position, session] of data.sessions.entries()) {
     const old = oldSessions.get(session.id);
+    if (!old) {
+      additions.push({ session, position });
+      continue;
+    }
     if (old && canonical(old.session) === canonical(session)) {
       const delta = position - old.position;
       if (delta) {
@@ -252,6 +275,20 @@ async function writeStudyData(
       });
     else await tx.sessionLog.deleteMany({ where: { userId, sessionId: session.id } });
   }
+  // Backup imports can introduce thousands of sessions. Batch their inserts
+  // instead of making two database round trips for every new session.
+  if (additions.length) {
+    await tx.studySession.createMany({
+      data: additions.map(({ session, position }) => ({
+        userId,
+        ...sessionRecord(session, position),
+      })),
+    });
+    const logs = additions.flatMap(({ session }) =>
+      session.reflection ? [{ userId, sessionId: session.id, ...session.reflection }] : []
+    );
+    if (logs.length) await tx.sessionLog.createMany({ data: logs });
+  }
   // Prepending a session/import shifts the rest with one SQL statement per offset.
   for (const [delta, ids] of shifts)
     await tx.studySession.updateMany({
@@ -265,6 +302,158 @@ export class AccountWorkspace implements WorkspaceStore {
     private db: PrismaClient,
     private userId: string
   ) {}
+
+  // Avoid reading/hash-checking the compatibility JSON on every history page.
+  // A row lock also keeps items, counts, and revision in one coherent snapshot.
+  private async query<T>(read: (tx: Transaction, revision: number) => Promise<T>) {
+    await this.initialize();
+    return this.db.$transaction(
+      async (tx) => {
+        await tx.$queryRaw`SELECT "userId" FROM "Workspace" WHERE "userId" = ${this.userId} FOR UPDATE`;
+        let row = await tx.workspace.findUniqueOrThrow({
+          where: { userId: this.userId },
+          select: { updatedAt: true, normalizedAt: true, revision: true },
+        });
+        if (!row.normalizedAt || row.normalizedAt.getTime() !== row.updatedAt.getTime()) {
+          await this.synchronize(tx);
+          const current = await tx.workspace.findUniqueOrThrow({
+            where: { userId: this.userId },
+            select: { updatedAt: true },
+          });
+          row = await tx.workspace.update({
+            where: { userId: this.userId },
+            data: {
+              updatedAt: current.updatedAt,
+              normalizedAt: current.updatedAt,
+              revision: { increment: 1 },
+            },
+            select: { updatedAt: true, normalizedAt: true, revision: true },
+          });
+        }
+        return read(tx, row.revision);
+      },
+      { timeout: 15000 }
+    );
+  }
+
+  async overview() {
+    return this.query(async (tx) => readStudyData(tx, this.userId, 25));
+  }
+
+  async session(id: string) {
+    return this.query(async (tx) => {
+      const row = await tx.studySession.findUnique({
+        where: { userId_id: { userId: this.userId, id } },
+        include: { log: true },
+      });
+      return row ? sessionFromRow(row) : null;
+    });
+  }
+
+  async history(query: HistoryQuery): Promise<HistoryPage> {
+    return this.query(async (tx, revision) => {
+      if (query.revision !== undefined && query.revision !== revision)
+        throw new WorkspaceImportError(
+          "Your history changed. Return to the first page to see the latest sessions.",
+          409
+        );
+      const search = query.q.replace(/[\\%_]/g, "\\$&");
+      const where: Prisma.StudySessionWhereInput = {
+        userId: this.userId,
+        ...(query.subject ? { subject: query.subject } : {}),
+        ...(query.reflected ? { log: { isNot: null } } : {}),
+        ...(query.q
+          ? {
+              OR: [
+                { flowTitle: { contains: search, mode: "insensitive" } },
+                { subject: { contains: search, mode: "insensitive" } },
+                { log: { is: { notes: { contains: search, mode: "insensitive" } } } },
+              ],
+            }
+          : {}),
+      };
+      const rows = await tx.studySession.findMany({
+        where,
+        include: { log: true },
+        orderBy: [{ startedAt: "desc" }, { id: "desc" }],
+        skip: query.offset,
+        take: query.limit,
+      });
+      const total = await tx.studySession.count({ where });
+      const subjects = await tx.$queryRaw<
+        { subject: string }[]
+      >`SELECT DISTINCT subject FROM "StudySession" WHERE "userId"=${this.userId} ORDER BY subject ASC`;
+
+      const end = query.offset + rows.length;
+      return {
+        items: rows.map(sessionFromRow),
+        total,
+        subjects: subjects.map((s) => s.subject),
+        nextOffset: end < total ? end : null,
+        revision,
+      };
+    });
+  }
+
+  async report(query: ReportQuery): Promise<StudyReport> {
+    return this.query(async (tx, revision) => {
+      const until = new Date(query.until);
+      // startedAt is a UTC TIMESTAMP WITHOUT TIME ZONE. Convert it explicitly
+      // before grouping by the requested local calendar date (including DST).
+      const totals = await tx.$queryRaw<
+        { day: string; minutes: number; count: bigint; completed: bigint; reflections: bigint }[]
+      >`
+        SELECT to_char((s."startedAt" AT TIME ZONE 'UTC' AT TIME ZONE ${query.timezone}), 'YYYY-MM-DD') AS day,
+          SUM(s."focusMinutes")::float8 AS minutes, COUNT(*) AS count,
+          COUNT(*) FILTER (WHERE s.status = 'completed') AS completed,
+          COUNT(l."sessionId") AS reflections
+        FROM "StudySession" s LEFT JOIN "SessionLog" l ON l."userId"=s."userId" AND l."sessionId"=s.id
+        WHERE s."userId"=${this.userId} AND s."startedAt" <= ${until}
+          AND s."startedAt" >= ((${query.startDay}::date::timestamp AT TIME ZONE ${query.timezone}) AT TIME ZONE 'UTC')
+        GROUP BY day`;
+      const subjects = await tx.$queryRaw<{ subject: string; minutes: number }[]>`
+        SELECT subject, SUM("focusMinutes")::float8 AS minutes FROM "StudySession"
+        WHERE "userId"=${this.userId} AND "startedAt" <= ${until}
+          AND "startedAt" >= ((${query.startDay}::date::timestamp AT TIME ZONE ${query.timezone}) AT TIME ZONE 'UTC')
+        GROUP BY subject ORDER BY minutes DESC, subject ASC`;
+      const active = await tx.$queryRaw<{ day: string }[]>`
+        SELECT DISTINCT to_char(("startedAt" AT TIME ZONE 'UTC' AT TIME ZONE ${query.timezone}), 'YYYY-MM-DD') AS day
+        FROM "StudySession" WHERE "userId"=${this.userId} AND "focusMinutes">0 AND "startedAt"<=${until}`;
+      return {
+        ...query,
+        revision,
+        totalSessions: await tx.studySession.count({ where: { userId: this.userId } }),
+        count: totals.reduce((sum, r) => sum + Number(r.count), 0),
+        focusMinutes: totals.reduce((sum, r) => sum + r.minutes, 0),
+        completed: totals.reduce((sum, r) => sum + Number(r.completed), 0),
+        reflections: totals.reduce((sum, r) => sum + Number(r.reflections), 0),
+        daily: reportDaily(query, new Map(totals.map((r) => [r.day, r.minutes]))),
+        subjects: subjects.map((r) => [r.subject, r.minutes]),
+        streak: streakFor(new Set(active.map((r) => r.day)), dateKey(until, query.timezone)),
+      };
+    });
+  }
+
+  async reportSessions(query: ReportQuery, revision: number) {
+    return this.query(async (tx, current) => {
+      if (current !== revision)
+        throw new WorkspaceImportError(
+          "Your sessions changed. Refresh the report before exporting.",
+          409
+        );
+      const ids = await tx.$queryRaw<
+        { id: string }[]
+      >`SELECT id FROM "StudySession" WHERE "userId"=${this.userId}
+        AND "startedAt"<=${new Date(query.until)}
+        AND "startedAt">=((${query.startDay}::date::timestamp AT TIME ZONE ${query.timezone}) AT TIME ZONE 'UTC')`;
+      const rows = await tx.studySession.findMany({
+        where: { userId: this.userId, id: { in: ids.map((r) => r.id) } },
+        include: { log: true },
+        orderBy: [{ startedAt: "desc" }, { id: "desc" }],
+      });
+      return rows.map(sessionFromRow);
+    });
+  }
 
   private async initialize() {
     await this.db.workspace.upsert({
@@ -292,14 +481,46 @@ export class AccountWorkspace implements WorkspaceStore {
         !Array.isArray(mirror.templates)
       )
         throw new Error("Unsupported stored workspace. Existing data was preserved.");
+      // A rollback client cannot serialize fields introduced after its release.
+      // Retain only known snapshots for the exact same immutable session core.
+      // Never infer old blocks from the current (editable) flow library.
+      const known = await tx.studySession.findMany({ where: { userId: this.userId } });
+      const byId = new Map(known.map((session) => [session.id, session]));
+      for (const session of mirror.sessions) {
+        if (!session) continue; // The round-trip check below rejects corrupt rows.
+        const old = byId.get(session.id);
+        if (
+          !old ||
+          old.flowId !== session.flowId ||
+          old.flowTitle !== session.flowTitle ||
+          old.flowTag !== session.flowTag ||
+          old.subject !== session.subject ||
+          old.startedAt.toISOString() !== session.startedAt ||
+          old.durationMinutes !== session.durationMinutes ||
+          old.focusMinutes !== session.focusMinutes ||
+          old.status !== session.status
+        )
+          continue;
+        if (session.blocks === undefined && old.blocks !== null)
+          session.blocks = old.blocks as unknown as StudyBlock[];
+        if (session.timingSource === undefined && old.timingSource === "legacy-estimate")
+          session.timingSource = "legacy-estimate";
+      }
       await seedStudyTypes(tx);
       await writeStudyData(tx, this.userId, mirror);
       const restored = await readStudyData(tx, this.userId);
       if (canonical(restored) !== canonical(mirror))
         throw new Error("Study migration did not preserve the existing workspace.");
+      const normalizedAt = new Date();
       await tx.workspace.update({
         where: { userId: this.userId },
-        data: { normalizedDigest: digest(mirror) },
+        data: {
+          data: mirror as unknown as Prisma.InputJsonValue,
+          updatedAt: normalizedAt,
+          normalizedDigest: digest(mirror),
+          normalizedAt,
+          revision: { increment: 1 },
+        },
       });
       return restored;
     }
@@ -319,11 +540,15 @@ export class AccountWorkspace implements WorkspaceStore {
         const previous = structuredClone(data);
         const result = change(data);
         await writeStudyData(tx, this.userId, data, previous);
+        const normalizedAt = new Date();
         await tx.workspace.update({
           where: { userId: this.userId },
           data: {
             data: data as unknown as Prisma.InputJsonValue,
             normalizedDigest: digest(data),
+            updatedAt: normalizedAt,
+            normalizedAt,
+            revision: { increment: 1 },
           },
         });
         return result;

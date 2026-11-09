@@ -51,10 +51,9 @@ function unique<T extends { id: string }>(values: T[], label: string): T[] {
     throw new WorkspaceImportError(`${label} contains duplicate IDs. No data was imported.`);
   return values;
 }
-function flow(value: unknown, template = false): StudyFlow {
-  const input = record(value);
+export function validateStudyBlocks(value: unknown) {
   const blocks = unique(
-    list(input.blocks, "Flow blocks", 20).map((value) => {
+    list(value, "Flow blocks", 20).map((value) => {
       const block = record(value);
       if (!["focus", "break", "review", "recall"].includes(String(block.type)))
         throw new WorkspaceImportError("A block has an unknown type.");
@@ -78,6 +77,12 @@ function flow(value: unknown, template = false): StudyFlow {
     throw new WorkspaceImportError("Every flow needs at least one study block.");
   const totalMinutes = blocks.reduce((sum, block) => sum + block.durationMinutes, 0);
   if (totalMinutes > 480) throw new WorkspaceImportError("A flow cannot exceed 480 minutes.");
+  return blocks;
+}
+function flow(value: unknown, template = false): StudyFlow {
+  const input = record(value);
+  const blocks = validateStudyBlocks(input.blocks);
+  const totalMinutes = blocks.reduce((sum, block) => sum + block.durationMinutes, 0);
   return {
     id: id(input.id, template ? "Template ID" : "Flow ID", template ? 100 : 80),
     title: text(input.title, "Flow name", 120),
@@ -124,6 +129,7 @@ function session(value: unknown): SessionLog {
     focusMinutes: number(input.focusMinutes, "Focus time", 0, durationMinutes),
     status: input.status,
     ...(input.timingSource === "legacy-estimate" ? { timingSource: "legacy-estimate" } : {}),
+    ...(input.blocks === undefined ? {} : { blocks: validateStudyBlocks(input.blocks) }),
     hasReflection: input.hasReflection,
   };
   if (input.hasReflection) {

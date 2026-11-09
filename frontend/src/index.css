@@ -1925,7 +1925,12 @@ button:disabled {
   align-items: center;
   gap: 10px;
   min-height: 0;
+  min-width: 0;
 }
+.day-label { overflow-wrap: anywhere; text-align: center; }
+.snapshot-detail { margin: 12px 0; color: var(--ink-soft); }
+.snapshot-detail summary { cursor: pointer; }
+.snapshot-detail li { margin-top: 6px; }
 .day-value,
 .day-label {
   font-size: 10px;

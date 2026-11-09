@@ -1,4 +1,5 @@
 import { test, expect, type Dialog, type Page } from "@playwright/test";
+import { readFile } from "node:fs/promises";
 
 const password = "class demo study passphrase 2026";
 async function reloadAcceptingDialogs(page: Page) {
@@ -119,6 +120,7 @@ test("student builds, completes two blocks, recovers a failed reflection and reo
   expect(saved.sessions).toHaveLength(1);
   expect(saved.sessions[0].status).toBe("completed");
   expect(saved.sessions[0].durationMinutes).toBe(2);
+  expect(saved.sessions[0].blocks).toEqual(flow.blocks);
   expect(saved.sessions[0].reflection.notes).toContain("cell division");
   await page.getByRole("button", { name: "Log out", exact: true }).click();
   await expect(page.locator(".account-name")).toHaveCount(0);
@@ -335,6 +337,75 @@ test("backup and legacy imports require review, preserve sources and safely dedu
   await page.getByRole("button", { name: "Session History", exact: true }).click();
   await expect(page.getByText("Imported legacy estimate", { exact: true })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("legacy-history.png"), fullPage: true });
+  // More than one page, with an old reflection outside the overview cache.
+  const origin = new URL(page.url()).origin;
+  for (let i = 0; i < 30; i++) {
+    const result = await page.request.post("/api/sessions", {
+      headers: { Origin: origin },
+      data: {
+        id: `paged-${i}`,
+        flowId: "saved-backup-flow",
+        flowTitle: `Paged study ${i}`,
+        flowTag: "Physics",
+        subject: "Physics",
+        startedAt: new Date(Date.now() - (i + 1) * 86400000).toISOString(),
+        durationMinutes: 1,
+        focusMinutes: 0.5,
+        status: "stopped",
+        blocks: source.flows[0].blocks,
+      },
+    });
+    expect(result.status()).toBe(201);
+  }
+  await page.reload();
+  await expect(page.getByText("Showing 1\u201325 of 32 sessions", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Next page", exact: true }).click();
+  await expect(page.getByText("Showing 26\u201332 of 32 sessions", { exact: true })).toBeVisible();
+  const oldest = page
+    .locator(".session-card")
+    .filter({ has: page.getByRole("heading", { name: "Paged study 29", exact: true }) });
+  await oldest.getByText("Flow at session start", { exact: true }).click();
+  await expect(oldest.getByRole("listitem").first()).toContainText(source.flows[0].blocks[0].title);
+  await oldest.getByRole("button", { name: "Add reflection \u2192", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Paged study 29", exact: true })).toBeVisible();
+  await page.getByLabel("What worked? What would you change?").fill("An older page reflection");
+  await page.getByRole("button", { name: "Save reflection", exact: true }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Reflection saved" })).toBeVisible();
+  await page.getByRole("button", { name: "Session History", exact: true }).click();
+  await page.getByLabel("Search sessions", { exact: true }).fill("older page reflection");
+  await expect(page.locator(".session-card")).toHaveCount(1);
+  await expect(page.getByRole("heading", { name: "Paged study 29", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Dashboard", exact: true }).click();
+  const summaryResponse = page.waitForResponse((response) =>
+    response.url().includes("/api/reports/summary?days=30&")
+  );
+  await page.getByRole("button", { name: "Last 30 days", exact: true }).click();
+  const report = await (await summaryResponse).json();
+  await expect(page.getByText("Study minutes \u00b7 last 30 days", { exact: true })).toBeVisible();
+  const download = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export report", exact: true }).click();
+  const reportFile = await download;
+  expect(reportFile.suggestedFilename()).toBe("methodica-report.csv");
+  const lines = (await readFile((await reportFile.path())!, "utf8")).split("\r\n");
+  expect(lines.length - 1).toBe(report.count);
+  const csvMinutes = lines
+    .slice(1)
+    .reduce((sum, row) => sum + Number(row.split(",")[5].replaceAll('"', "")), 0);
+  expect(csvMinutes).toBeCloseTo(report.focusMinutes, 8);
+  expect(
+    report.daily.reduce((sum: number, day: { minutes: number }) => sum + day.minutes, 0)
+  ).toBeCloseTo(csvMinutes, 8);
+  await page.request.put("/api/sessions/paged-0/log", {
+    headers: { Origin: origin },
+    data: { comprehension: 4, fatigue: 2, notes: "Changed in another tab" },
+  });
+  await page.getByRole("button", { name: "Export report", exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText("Refresh the report");
+  await page.getByRole("button", { name: "Refresh report", exact: true }).click();
+  await expect(page.getByText("Study minutes \u00b7 last 30 days", { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath("mobile-report.png"), fullPage: true });
+
   await page.getByRole("button", { name: "Log out", exact: true }).click();
   await expect(page).toHaveURL(/#login$/);
   await register(page, "Other backup student", `backup-other-${Date.now()}@example.test`);
