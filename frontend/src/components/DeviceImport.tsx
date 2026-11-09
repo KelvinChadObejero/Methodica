@@ -259,8 +259,8 @@ export default function DeviceImport() {
         </>
       )}
       <p className="muted">
-        This copies the current browser workspace. Exported backup files and older app storage are
-        not imported here. Ongoing timers stay on this device. Export a backup from Settings before
+        This copies the current browser workspace. Use the backup import below for exported files or
+        older app storage. Ongoing timers stay on this device. Export a backup from Settings before
         clearing browser data.
       </p>
     </section>

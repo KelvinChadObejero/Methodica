@@ -85,6 +85,9 @@ async function readStudyData(tx: Transaction, userId: string): Promise<Workspace
       focusMinutes: row.focusMinutes,
       subject: row.subject,
       status: row.status,
+      ...(row.timingSource === "legacy-estimate"
+        ? { timingSource: "legacy-estimate" as const }
+        : {}),
       hasReflection: row.log !== null,
       ...(row.log
         ? {
@@ -113,6 +116,7 @@ function sessionRecord(session: SessionLog, position: number) {
     focusMinutes: session.focusMinutes,
     subject: session.subject,
     status: session.status,
+    timingSource: session.timingSource ?? null,
   };
 }
 

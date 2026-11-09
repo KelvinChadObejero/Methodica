@@ -226,3 +226,117 @@ test("technique sources and quick-load work in a narrow device workspace", async
   );
   await page.screenshot({ path: testInfo.outputPath("mobile-builder.png"), fullPage: true });
 });
+
+test("backup and legacy imports require review, preserve sources and safely deduplicate retries", async ({
+  page,
+}, testInfo) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  const email = `backup-${Date.now()}@example.test`;
+  await register(page, "Backup student", email);
+  await page.getByRole("button", { name: "Workspace Connection", exact: true }).click();
+  const area = page.getByRole("region", {
+    name: "Import a backup or older sessions.",
+    exact: true,
+  });
+  const preview = await (await page.request.get("/api/preview")).json();
+  const source = preview.workspace;
+  source.flows = [{ ...source.flows[0], id: "saved-backup-flow", title: "Saved backup flow" }];
+  source.sessions = [
+    {
+      id: "saved-backup-session",
+      flowId: "saved-backup-flow",
+      flowTitle: "Saved backup flow",
+      flowTag: "General",
+      subject: "General",
+      startedAt: new Date(Date.now() - 120000).toISOString(),
+      durationMinutes: 1,
+      focusMinutes: 1,
+      status: "completed",
+      hasReflection: true,
+      reflection: {
+        comprehension: 4,
+        fatigue: 2,
+        notes: "Backup notes",
+        sessionTitle: "Saved backup flow",
+        sessionSubtitle: "General",
+      },
+    },
+  ];
+  let uploads = 0;
+  await page.route("**/api/workspace/import", (route) => {
+    uploads++;
+    return route.continue();
+  });
+  await area.getByLabel("Methodica JSON backup").setInputFiles({
+    name: "study-backup.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify({ workspace: source, preferences: { role: "admin" } })),
+  });
+  await area.getByRole("button", { name: "Review backup", exact: true }).click();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await expect(area.getByText(/Destination account:/)).toContainText(email);
+  await expect(
+    area.getByRole("button", { name: "Copy backup to my account", exact: true })
+  ).toBeDisabled();
+  expect(uploads).toBe(0);
+  await area.getByRole("button", { name: "Cancel backup review", exact: true }).click();
+  expect(uploads).toBe(0);
+  await area.getByRole("button", { name: "Review backup", exact: true }).click();
+  await area.getByLabel(/I want to copy these backup records/).check();
+  await area.getByRole("button", { name: "Copy backup to my account", exact: true }).click();
+  await expect(area.getByRole("status")).toContainText("1 flows, 1 sessions");
+  await area.getByRole("button", { name: "Review backup again", exact: true }).click();
+  await expect(
+    area.getByText("There is nothing new to copy. Your account has not been changed.", {
+      exact: true,
+    })
+  ).toBeVisible();
+  expect(uploads).toBe(1);
+  const legacy = {
+    id: "old-timer-1",
+    flowTitle: "Old biology",
+    flowTag: "Biology",
+    subject: "Biology",
+    startedAt: new Date(Date.now() - 3600000).toISOString(),
+    durationMinutes: 25,
+    hasReflection: false,
+  };
+  await page.evaluate(
+    (value) => localStorage.setItem("methodica-sessions", JSON.stringify([value])),
+    legacy
+  );
+  await area.getByRole("button", { name: "Read older browser sessions", exact: true }).click();
+  await expect(area.getByText(/The old timer saved planned durations/)).toBeVisible();
+  await area.getByRole("button", { name: "Review backup", exact: true }).click();
+  const changedLegacy = { ...legacy, flowTitle: "Updated old biology" };
+  await page.evaluate(
+    (value) => localStorage.setItem("methodica-sessions", JSON.stringify([value])),
+    changedLegacy
+  );
+  await area.getByLabel(/I want to copy these backup records/).check();
+  await area.getByRole("button", { name: "Copy backup to my account", exact: true }).click();
+  await expect(area.getByRole("alert")).toContainText("Older browser sessions changed");
+  expect(uploads).toBe(1);
+  await area.getByRole("button", { name: "Read older browser sessions", exact: true }).click();
+  await area.getByRole("button", { name: "Review backup", exact: true }).click();
+  await area.getByLabel(/I want to copy these backup records/).check();
+  await area.getByRole("button", { name: "Copy backup to my account", exact: true }).click();
+  await expect(area.getByRole("status")).toContainText("0 flows, 1 sessions");
+  const saved = await (await page.request.get("/api/workspace")).json();
+  expect(saved.sessions).toHaveLength(2);
+  const old = saved.sessions.find(
+    (session: { timingSource?: string }) => session.timingSource === "legacy-estimate"
+  );
+  expect(old.focusMinutes).toBe(0);
+  expect(old.status).toBe("stopped");
+  expect(await page.evaluate(() => localStorage.getItem("methodica-sessions"))).toBe(
+    JSON.stringify([changedLegacy])
+  );
+  await page.getByRole("button", { name: "Session History", exact: true }).click();
+  await expect(page.getByText("Imported legacy estimate", { exact: true })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath("legacy-history.png"), fullPage: true });
+  await page.getByRole("button", { name: "Log out", exact: true }).click();
+  await expect(page).toHaveURL(/#login$/);
+  await register(page, "Other backup student", `backup-other-${Date.now()}@example.test`);
+  expect((await (await page.request.get("/api/workspace")).json()).sessions).toHaveLength(0);
+});

@@ -1,7 +1,8 @@
 import type { Workspace, StudyFlow, StudyFlowTemplate, SessionLog } from "./domain.js";
 import { studyTypes } from "./seed.js";
 
-export const MAX_IMPORT_BYTES = 8 * 1024 * 1024;
+// Stay below Vercel's 4.5 MB request cap, including the review envelope.
+export const MAX_IMPORT_BYTES = 4 * 1024 * 1024;
 export class WorkspaceImportError extends Error {
   constructor(
     message: string,
@@ -99,6 +100,15 @@ function session(value: unknown): SessionLog {
   if (input.status !== "completed" && input.status !== "stopped")
     throw new WorkspaceImportError("A session has an unknown completion status.");
   if (
+    input.timingSource !== undefined &&
+    (input.timingSource !== "legacy-estimate" ||
+      input.focusMinutes !== 0 ||
+      input.status !== "stopped")
+  )
+    throw new WorkspaceImportError(
+      "A legacy estimate cannot claim measured study time or completion."
+    );
+  if (
     typeof input.hasReflection !== "boolean" ||
     input.hasReflection !== (input.reflection !== undefined)
   )
@@ -113,6 +123,7 @@ function session(value: unknown): SessionLog {
     durationMinutes,
     focusMinutes: number(input.focusMinutes, "Focus time", 0, durationMinutes),
     status: input.status,
+    ...(input.timingSource === "legacy-estimate" ? { timingSource: "legacy-estimate" } : {}),
     hasReflection: input.hasReflection,
   };
   if (input.hasReflection) {
@@ -136,7 +147,7 @@ export function validateImportWorkspace(value: unknown): Workspace {
     throw new WorkspaceImportError("This workspace version is not supported.");
   if (new TextEncoder().encode(JSON.stringify(value)).byteLength > MAX_IMPORT_BYTES - 1024)
     throw new WorkspaceImportError(
-      "This device workspace is too large to import at once (8 MB). Export a backup in Settings; your data has not been changed.",
+      "This workspace is too large to import at once (4 MB). Export a backup in Settings; your data has not been changed.",
       413
     );
   return {

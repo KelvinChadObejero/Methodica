@@ -129,11 +129,17 @@ export default function SessionHistory() {
                 </div>
                 <div className="session-details">
                   <span>
-                    {session.status === "completed"
-                      ? "Completed in full"
-                      : "Ended early / blocks skipped"}
+                    {session.timingSource === "legacy-estimate"
+                      ? "Imported legacy estimate"
+                      : session.status === "completed"
+                        ? "Completed in full"
+                        : "Ended early / blocks skipped"}
                   </span>
-                  <span>{session.focusMinutes.toFixed(1)} min studying</span>
+                  <span>
+                    {session.timingSource === "legacy-estimate"
+                      ? "Measured study time unavailable"
+                      : `${session.focusMinutes.toFixed(1)} min studying`}
+                  </span>
                 </div>
                 <div className="inline-actions">
                   {session.reflection && (

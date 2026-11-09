@@ -49,6 +49,7 @@ export interface SessionLog {
   focusMinutes: number;
   subject: string;
   status: "completed" | "stopped";
+  timingSource?: "legacy-estimate";
   hasReflection: boolean;
   reflection?: ReflectionEntry;
 }
