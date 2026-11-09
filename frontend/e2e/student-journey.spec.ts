@@ -240,7 +240,7 @@ test("student builds, completes two blocks, recovers a failed reflection and reo
   await expect(bob.getByRole("heading", { name: "Your story starts here." })).toBeVisible();
   expect((await (await bob.request.get("/api/workspace")).json()).sessions).toHaveLength(0);
   const denied = await bob.request.put(`/api/sessions/${saved.sessions[0].id}/log`, {
-    headers: { Origin: "http://127.0.0.1:5174" },
+    headers: { Origin: new URL(bob.url()).origin },
     data: { comprehension: 1, fatigue: 1, notes: "unauthorized" },
   });
   expect(denied.status()).toBe(404);
