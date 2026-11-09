@@ -14,7 +14,7 @@ The old unauthenticated file adapter requires ALLOW_LOCAL_WORKSPACE=true outside
 
 Registration signs in immediately. Better Auth normalizes emails and hashes passwords with scrypt; passwords require 12–128 characters. Revocable seven-day sessions use HttpOnly, SameSite=Lax cookies, Secure on hosted HTTPS. Database-backed throttling limits login and registration across function instances. Private writes validate Origin; ownership always comes from the session. StudyFlow, ordered StudyBlock, StudyType, StudySession and one-per-session SessionLog rows use owner-scoped keys. An account row lock serializes transactions across all study tables. The older JSON document remains a transactionally maintained compatibility mirror for rolling upgrades and rollback; see [the data model and migration guide](../docs/DATA_MODEL.md).
 
-Device workspaces can be explicitly reviewed and copied into accounts without overwriting existing records or clearing browser data; see [the import guide](../docs/DEVICE_IMPORT.md). Email verification/reset, mentor roles, backup-file/legacy imports and automatic live synchronization remain follow-up work. See [AUTH.md](../docs/AUTH.md) and [API.md](../docs/API.md).
+Device workspaces, validated JSON backups and original legacy sessions can be explicitly reviewed and copied into accounts without overwriting existing records or clearing sources; see [the import guide](../docs/DEVICE_IMPORT.md). Legacy estimates persist with zero measured focus time. Email verification/reset, mentor roles and automatic live synchronization remain follow-up work. See [AUTH.md](../docs/AUTH.md) and [API.md](../docs/API.md).
 
 ## Deployment
 

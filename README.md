@@ -27,7 +27,7 @@ Open http://localhost:5173. Vite proxies `/api` to `127.0.0.1:4000`; both proces
 ## What works in this development version
 
 - Accounts: email/password registration, login/logout, restored sessions and private PostgreSQL workspaces.
-- Device import: review and explicitly copy browser flows, sessions/reflections and private templates into an account without clearing local data or overwriting account records. See [the import guide](docs/DEVICE_IMPORT.md).
+- Imports: review and explicitly copy browser data, JSON workspace backups and older browser sessions into an account without clearing sources or overwriting account records. Legacy timing estimates stay labelled and do not inflate study time. See [the import guide](docs/DEVICE_IMPORT.md).
 - Flow library: create, rename, edit, delete, add/remove/reorder blocks by dragging or keyboard, calculate duration, and recover unsaved drafts in the same tab.
 - Technique toolkit with research references and quick-load blocks; import a starter template into the library and publish a saved flow to the private collection.
 - Timer using saved flows, pause/resume, skip, actual elapsed study time, and recovery after refresh in the same tab.

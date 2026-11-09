@@ -14,7 +14,38 @@ If the connection fails after a save, leave the browser data alone and review ag
 
 ## Boundaries
 
-This imports only the current `methodica-device-workspace-v1` workspace. Arbitrary backup uploads and older legacy storage remain DB-03 follow-up work. Version, IDs, unique records, blocks, dates, durations and reflection fields are validated before writing. The import is limited to 8 MB per request and the existing account limits of 100 flows, 5,000 sessions and 200 private templates. A failed validation/limit check rejects the entire import; it never silently truncates data.
+The device section imports the current `methodica-device-workspace-v1` workspace. The backup section below it also accepts Methodica JSON exports and older session records, as described below. Version, IDs, unique records, blocks, dates, durations and reflection fields are validated before writing. The import is limited to 8 MB per request and the existing account limits of 100 flows, 5,000 sessions and 200 private templates. A failed validation/limit check rejects the entire import; it never silently truncates data.
+
+## Backup files and older browser sessions (DB-03)
+
+In **Workspace Connection → Import a backup or older sessions**, choose a JSON
+file or select **Read older browser sessions**. Reading and validation happen in
+the browser. No records upload until you review the destination account, names,
+counts and conflicts, check the confirmation naming that account, and select
+**Copy backup to my account**. Cancel never changes the account. Account changes
+after review are rejected by the existing account-bound import token.
+
+Supported files are the Settings JSON export (`{exportedAt, workspace,
+preferences}`), a device backup (`{workspace, studyTypes}`), a raw version 1
+workspace, an original legacy session array, or an older storage export with a
+JSON-string `methodica-sessions` entry. CSV is a report and cannot reconstruct a
+workspace. Preferences, credentials, unrelated storage and active timers are
+never copied. Unsupported versions, malformed records, duplicate source IDs or
+oversized inputs reject the entire file.
+
+Original legacy timers saved planned durations, including on some early
+finishes. Imports preserve these records as `timingSource: legacy-estimate`,
+with zero measured focus time and no completion/streak credit. History and
+reflection identify them as estimates; CSV records the timing source. No
+historical flow blocks or execution events are invented. IDs are stable hashes
+of the original record ID, so the same legacy record read from a browser or
+backup is not duplicated. Different versions keep the account copy.
+
+The selected file and older browser storage remain intact. If browser legacy
+records change between reading and copying, the UI rejects that review before
+uploading; read and review them again. Switching accounts closes the source and
+review context. Each import uses the same owner-scoped atomic API transaction
+and existing limits as the device import.
 
 ## Kelvin's review checklist
 

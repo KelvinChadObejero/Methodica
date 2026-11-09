@@ -74,6 +74,11 @@ function ReflectionForm({ session }: { session: SessionLog }) {
         {session.subject} · {new Date(session.startedAt).toLocaleString()} ·{" "}
         {session.durationMinutes.toFixed(1)} min
       </p>
+      {session.timingSource === "legacy-estimate" && (
+        <p className="muted">
+          Imported legacy estimate. The original timer did not record measured study time.
+        </p>
+      )}
       {restored && dirty && (
         <p className="feedback">
           Your unsaved reflection was restored from this tab. Save it to update your session.

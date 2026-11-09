@@ -1,6 +1,7 @@
 import { useWorkspace } from "../lib/useWorkspace";
 import { navigate } from "../lib/navigation";
 import DeviceImport from "../components/DeviceImport";
+import BackupImport from "../components/BackupImport";
 
 export default function SyncSettings() {
   const { data, mode, user, loading, error, refreshedAt, reload, connectServer, startDevice } =
@@ -92,6 +93,7 @@ export default function SyncSettings() {
         )}
       </div>
       <DeviceImport key={`${mode}-${user?.id || "guest"}`} />
+      <BackupImport key={`backup-${mode}-${user?.id || "guest"}`} />
     </section>
   );
 }

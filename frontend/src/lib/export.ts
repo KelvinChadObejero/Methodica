@@ -26,6 +26,7 @@ export function sessionsCsv(sessions: SessionLog[]) {
     session.reflection?.comprehension,
     session.reflection?.fatigue,
     session.reflection?.notes,
+    session.timingSource || "recorded",
   ]);
   return [
     [
@@ -39,6 +40,7 @@ export function sessionsCsv(sessions: SessionLog[]) {
       "comprehension",
       "fatigue",
       "notes",
+      "timingSource",
     ],
     ...rows,
   ]

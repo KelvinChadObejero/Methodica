@@ -6,7 +6,7 @@ The website supports email/password registration, login, logout, restored sessio
 
 Better Auth owns User, Account, Session, Verification and RateLimit tables. StudyFlow, StudyBlock, StudyType, StudySession and SessionLog hold study data with composite owner-scoped keys and cascading ownership. The API derives ownership from the verified session, never from a body or account-scope header. A Workspace row lock serializes writes across function instances; its JSON document remains a compatibility mirror for rolling upgrades and rollback. See [DATA_MODEL.md](DATA_MODEL.md) for the schema, deletion rules, migration and retained HTTP contract.
 
-Registration starts a fresh account workspace. Existing device data stays separate and is never silently uploaded. Users can explicitly review and copy the current browser workspace from Workspace Connection; see [DEVICE_IMPORT.md](DEVICE_IMPORT.md). Device exports remain available, while backup-file and legacy migrations remain follow-up work. Saved templates are private copies, not public community posts.
+Registration starts a fresh account workspace. Existing device data stays separate and is never silently uploaded. Users can explicitly review and copy the current browser workspace, JSON backups and original legacy session records from Workspace Connection; see [DEVICE_IMPORT.md](DEVICE_IMPORT.md). Legacy estimates do not claim measured study time. Saved templates are private copies, not public community posts.
 
 ## Browser and session behavior
 

@@ -99,6 +99,15 @@ function session(value: unknown): SessionLog {
   if (input.status !== "completed" && input.status !== "stopped")
     throw new WorkspaceImportError("A session has an unknown completion status.");
   if (
+    input.timingSource !== undefined &&
+    (input.timingSource !== "legacy-estimate" ||
+      input.focusMinutes !== 0 ||
+      input.status !== "stopped")
+  )
+    throw new WorkspaceImportError(
+      "A legacy estimate cannot claim measured study time or completion."
+    );
+  if (
     typeof input.hasReflection !== "boolean" ||
     input.hasReflection !== (input.reflection !== undefined)
   )
@@ -113,6 +122,7 @@ function session(value: unknown): SessionLog {
     durationMinutes,
     focusMinutes: number(input.focusMinutes, "Focus time", 0, durationMinutes),
     status: input.status,
+    ...(input.timingSource === "legacy-estimate" ? { timingSource: "legacy-estimate" } : {}),
     hasReflection: input.hasReflection,
   };
   if (input.hasReflection) {

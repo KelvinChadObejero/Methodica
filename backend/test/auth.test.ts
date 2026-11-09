@@ -217,6 +217,9 @@ test(
       device.sessions.push({
         ...sessionInput,
         id: "device-session",
+        focusMinutes: 0,
+        status: "stopped",
+        timingSource: "legacy-estimate",
         flowId: "device-flow",
         hasReflection: true,
         reflection: { ...reflection, sessionTitle: "Device study", sessionSubtitle: "Biology" },
@@ -280,6 +283,18 @@ test(
       assert.deepEqual(retried.body.summary.added, { flows: 0, sessions: 0, templates: 0 });
       const imported = (await request("/workspace", "GET", undefined, login.cookie))
         .body as Workspace;
+      assert.equal(
+        imported.sessions.find((session) => session.id === "device-session")?.timingSource,
+        "legacy-estimate"
+      );
+      assert.equal(
+        (
+          await db.studySession.findUniqueOrThrow({
+            where: { userId_id: { userId: signedUp.body.user.id, id: "device-session" } },
+          })
+        ).timingSource,
+        "legacy-estimate"
+      );
       assert.equal(
         imported.sessions.filter((session) => session.id === "device-session").length,
         1

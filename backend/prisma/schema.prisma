@@ -169,6 +169,7 @@ model StudySession {
   focusMinutes    Float
   subject         String
   status          StudySessionStatus
+  timingSource    String?
   log             SessionLog?
 
   @@id([userId, id])

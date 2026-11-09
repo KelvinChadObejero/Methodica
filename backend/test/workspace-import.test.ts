@@ -65,6 +65,38 @@ test("import preserves existing records, snapshots, browser data and stable IDs"
   assert.deepEqual(repeat.merged, planned.merged);
 });
 
+test("legacy estimates retain provenance and cannot inflate measured study time", () => {
+  const source = device();
+  source.sessions[0] = {
+    ...source.sessions[0],
+    timingSource: "legacy-estimate",
+    focusMinutes: 0,
+    status: "stopped",
+  };
+  const normalized = validateImportWorkspace(source);
+  const imported = planWorkspaceImport(initialWorkspace(), normalized);
+  assert.equal(imported.merged.sessions[0].timingSource, "legacy-estimate");
+  assert.equal(imported.merged.sessions[0].focusMinutes, 0);
+  const retry = planWorkspaceImport(imported.merged, normalized);
+  assert.equal(retry.summary.added.sessions, 0);
+  assert.throws(
+    () =>
+      validateImportWorkspace({
+        ...source,
+        sessions: [{ ...source.sessions[0], focusMinutes: 1 }],
+      }),
+    /cannot claim/
+  );
+  assert.throws(
+    () =>
+      validateImportWorkspace({
+        ...source,
+        sessions: [{ ...source.sessions[0], status: "completed" }],
+      }),
+    /cannot claim/
+  );
+});
+
 test("conflicting IDs keep account versions, including newer reflection notes", () => {
   const source = validateImportWorkspace(device());
   const target = structuredClone(source);

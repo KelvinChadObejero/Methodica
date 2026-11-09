@@ -2,6 +2,8 @@
 
 Updated 2026-11-09. For Kelvin and Andrei. This is the working backlog; update it in the same PR as the work. The [original review roadmap](docs/REVIEW_ROADMAP.md) is retained as a reference, not a second status tracker.
 
+Current implementation: **DB-03** (reviewed backup-file and legacy-browser imports), then **M5-02 / S4-02** (server-side history and analytics), on `codex/backup-import-and-history`. **AUTH-RECOVERY depends on an owned, verified sender domain**: the maintainer selected Resend but confirmed no domain is owned yet. Vercel CLI is connected; Resend is not provisioned, and no recovery email service is claimed to be working.
+
 Released: **DB-01, DB-02, WEB-01, M2-02, M3-02 and S3-02** are done in [PR #5](https://github.com/KelvinChadObejero/Methodica/pull/5), squash-merged and deployed on 2026-11-09 after source review, green CI and maintainer authorization. [Production verification](docs/RELEASE_VERIFICATION.md) confirms a complete two-block session, reflection, re-login, a second browser and account isolation. See [the data model](docs/DATA_MODEL.md) and [the class demo/browser-test guide](docs/CLASS_DEMO.md). QA-02 automation is implemented; manual screen-reader/contrast review and three-classmate testing remain open. Both packages pass lint/tests/build; 15 frontend tests, 11 API/database tests and 3 Chromium journeys pass, including failed saves, expiry recovery and 375px layouts.
 
 The proposal v2 specifies React + TypeScript on web, React Native + Expo on mobile, and Node.js + Express + TypeScript with PostgreSQL and Prisma. Sections 7.2–7.3 and 13.2 establish the backend direction, with a caveat for instructor requirements. Keep the two Spring Boot projects as separate classroom assignments. Do not connect the website to two production APIs.
@@ -36,7 +38,7 @@ All of these run locally on the Express development API. None imply that account
 - [x] **AUTH-01 · Andrei owns / Kelvin reviews:** registration, login/logout, persisted cookie sessions, password confirmation, account screens and expired-session handling. Better Auth uses scrypt/database sessions; see [the proposal adjustment](docs/AUTH.md).
 - [x] **AUTH-02 · Andrei owns / Kelvin reviews:** PostgreSQL/Prisma owner-scoped workspaces, row-lock mutations and tests for two-user access, revocation, expiry, CSRF origins, stale-tab scope and database throttling.
 - [ ] **AUTH-QA · Both:** review the PR, repeat signup → flow → timer → reflection → logout/login on its preview, and confirm production after merge. Device data must stay separate.
-- [ ] **AUTH-RECOVERY · Andrei / Kelvin:** email delivery, verification and password reset; M1-01 remains incomplete until recovery works.
+- [ ] **AUTH-RECOVERY · Andrei / Kelvin:** **Blocked: owned, verified sender domain.** Resend selected; Vercel CLI connected, but the maintainer confirmed no domain is owned yet. Email delivery, verification and password reset remain incomplete; M1-01 stays in progress.
 
 ## Next milestone: private student workspace
 
@@ -49,7 +51,7 @@ The private study workspace is deployed with normalized PostgreSQL/Prisma entiti
 | M1-01      | P0       | Andrei / Kelvin            | In progress  | DB-02         | Register, sign in/out, recover access; library-managed password hashes and revocable/expiring sessions (see AUTH.md for the Better Auth decision). Registration cannot grant privileged roles.                                                    |
 | M1-02      | P0       | Andrei / Kelvin            | In progress  | M1-01         | Every private flow/session/reflection query enforces owner access. Two-user tests prove another user's IDs cannot be read, changed, exported or deleted. Mentor access follows an explicit permission rule.           |
 | WEB-01     | P0       | Kelvin / Andrei            | Done | M1-01         | Account screens, protected routes, expired-session recovery, useful loading/error states. Draft study work survives a recoverable request failure.                                                                    |
-| DB-03      | P0       | Both                       | To do  | DB-02         | Decide how to import existing local workspace exports and legacy `methodica-sessions` browser records without overwriting, duplicating or attributing them to the wrong account. Test malformed imports.              |
+| DB-03      | P0       | Both                       | In review | DB-02         | Decide how to import existing local workspace exports and legacy `methodica-sessions` browser records without overwriting, duplicating or attributing them to the wrong account. Test malformed imports.              |
 | RELEASE-01 | P0       | Both                       | In progress | M1-02, WEB-01 | New student signs in, builds a two-block flow, completes it, saves a reflection, signs out/in, and finds the same session/reflection. Repeat with a second account and device.                                        |
 
 Do not mark RELEASE-01 done based only on a screen looking complete. It requires the whole journey, persisted database records, and ownership tests.
