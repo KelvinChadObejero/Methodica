@@ -2,7 +2,7 @@
 
 Updated 2026-11-09. For Kelvin and Andrei. This is the working backlog; update it in the same PR as the work. The [original review roadmap](docs/REVIEW_ROADMAP.md) is retained as a reference, not a second status tracker.
 
-Current work: **DB-01, DB-02, WEB-01, M2-02, M3-02 and S3-02** implemented on `codex/study-database-foundation`; partner review and hosted acceptance remain required. See [the data model](docs/DATA_MODEL.md) and [the class demo/browser-test guide](docs/CLASS_DEMO.md). QA-02 automation is implemented; manual screen-reader/contrast review and three-classmate testing remain open.
+Current work: **DB-01, DB-02, WEB-01, M2-02, M3-02 and S3-02** implemented in [PR #5](https://github.com/KelvinChadObejero/Methodica/pull/5); partner review and hosted acceptance remain required. See [the data model](docs/DATA_MODEL.md) and [the class demo/browser-test guide](docs/CLASS_DEMO.md). QA-02 automation is implemented; manual screen-reader/contrast review and three-classmate testing remain open. Local validation: both packages pass lint/tests/build; 15 frontend tests, 11 API/database tests and 3 Chromium journeys pass, including real two-block completion, 375px layouts, failed saves, expiry recovery and account isolation.
 
 The proposal v2 specifies React + TypeScript on web, React Native + Expo on mobile, and Node.js + Express + TypeScript with PostgreSQL and Prisma. Sections 7.2–7.3 and 13.2 establish the backend direction, with a caveat for instructor requirements. Keep the two Spring Boot projects as separate classroom assignments. Do not connect the website to two production APIs.
 
