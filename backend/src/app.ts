@@ -24,6 +24,7 @@ import {
 import { historyQuery, historyPage } from "./history.js";
 import { reportQuery, studyReport, inReport } from "./reporting.js";
 import { sessionsCsv } from "./csv.js";
+import { SessionSharing } from "./session-sharing.js";
 
 class HttpError extends Error {
   constructor(
@@ -123,6 +124,11 @@ export function createApp(options: { dataFile?: string; accounts?: AccountServic
       Promise.resolve(handler(req, res, next)).catch(next);
     };
   const storeFor = (res: express.Response): WorkspaceStore => res.locals.store;
+  const sharingFor = (res: express.Response) => {
+    if (!accounts || !res.locals.accountId)
+      throw new HttpError(401, "Log in to share sessions with another account.");
+    return new SessionSharing(accounts.db, res.locals.accountId);
+  };
   app.disable("x-powered-by");
   app.use(cors({ origin: accounts?.origins || "http://localhost:5173", credentials: true }));
   app.get(["/health", "/api/health"], (_req, res) =>
@@ -190,6 +196,72 @@ export function createApp(options: { dataFile?: string; accounts?: AccountServic
     "/api/workspace",
     handle(async (_req, res) => {
       await streamJson(res, await storeFor(res).read());
+    })
+  );
+  app.get(
+    "/api/sharing/profile",
+    handle(async (_req, res) => {
+      res.json(await sharingFor(res).profile());
+    })
+  );
+  app.get(
+    "/api/sharing/recipient",
+    handle(async (req, res) => {
+      res.json(
+        await sharingFor(res).lookup(
+          new URL(req.originalUrl, "http://localhost").searchParams.get("code")
+        )
+      );
+    })
+  );
+  app.get(
+    "/api/sessions/:id/shares",
+    handle(async (req, res) => {
+      res.json(await sharingFor(res).ownGrants(req.params.id));
+    })
+  );
+  app.post(
+    "/api/sessions/:id/shares",
+    handle(async (req, res) => {
+      const input = object(req.body);
+      if (typeof input.includeReflection !== "boolean")
+        throw new HttpError(400, "Choose whether to include reflection notes.");
+      res.json(
+        await sharingFor(res).share(req.params.id, input.recipientCode, input.includeReflection)
+      );
+    })
+  );
+  app.put(
+    "/api/sessions/:id/shares/:shareId",
+    handle(async (req, res) => {
+      const input = object(req.body);
+      if (typeof input.includeReflection !== "boolean")
+        throw new HttpError(400, "Choose whether to include reflection notes.");
+      res.json(
+        await sharingFor(res).update(req.params.id, req.params.shareId, input.includeReflection)
+      );
+    })
+  );
+  app.delete(
+    "/api/sessions/:id/shares/:shareId",
+    handle(async (req, res) => {
+      await sharingFor(res).revoke(req.params.id, req.params.shareId);
+      res.status(204).end();
+    })
+  );
+  app.get(
+    "/api/shared-sessions",
+    handle(async (req, res) => {
+      const offset = new URL(req.originalUrl, "http://localhost").searchParams.get("offset") || "0";
+      if (!/^\d+$/.test(offset) || Number(offset) > 5000)
+        throw new HttpError(400, "Invalid shared-session page.");
+      res.json(await sharingFor(res).received(Number(offset)));
+    })
+  );
+  app.get(
+    "/api/shared-sessions/:shareId",
+    handle(async (req, res) => {
+      res.json(await sharingFor(res).receivedSession(req.params.shareId));
     })
   );
   app.get(

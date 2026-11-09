@@ -723,3 +723,355 @@ test(
     }
   }
 );
+
+test(
+  "selected session shares are explicit, read-only, reflection opt-in and revocable",
+  { timeout: 120000 },
+  async () => {
+    const postgres = process.env.TEST_DATABASE_URL
+      ? null
+      : await startPrismaDevServer({
+          persistenceMode: "stateless",
+          name: "methodica-sharing-test",
+          port: 0,
+          databasePort: 0,
+          shadowDatabasePort: 0,
+          streamsPort: 0,
+        });
+    const url = process.env.TEST_DATABASE_URL || postgres!.database.connectionString;
+    const db = createDatabase(url, postgres ? 1 : 3);
+    const server = createServer();
+    const emails = [
+      "sharing-owner@example.test",
+      "sharing-mentor@example.test",
+      "sharing-other@example.test",
+    ];
+    try {
+      await promisify(execFile)(
+        process.execPath,
+        ["node_modules/prisma/build/index.js", "migrate", "deploy"],
+        { env: { ...process.env, DATABASE_URL: url }, timeout: 30000 }
+      );
+      server.listen(0, "127.0.0.1");
+      await once(server, "listening");
+      const address = server.address();
+      assert(address && typeof address !== "string");
+      const origin = `http://127.0.0.1:${address.port}`;
+      // Exercise the production trusted-client-IP configuration for these fixture
+      // clients, separately from the shared fallback bucket in the throttle test.
+      const priorVercel = process.env.VERCEL;
+      let auth: ReturnType<typeof createAuthentication>;
+      try {
+        process.env.VERCEL = "1";
+        auth = createAuthentication(db, randomBytes(48).toString("base64url"), [origin]);
+      } finally {
+        if (priorVercel === undefined) delete process.env.VERCEL;
+        else process.env.VERCEL = priorVercel;
+      }
+      server.on("request", createApp({ accounts: { db, auth, origins: [origin] } }));
+      async function request(
+        path: string,
+        method = "GET",
+        body?: unknown,
+        cookie = "",
+        requestOrigin = origin
+      ) {
+        const response = await fetch(origin + "/api" + path, {
+          method,
+          headers: {
+            Origin: requestOrigin,
+            Cookie: cookie,
+            "Content-Type": "application/json",
+            "x-real-ip": "198.51.100.77",
+          },
+          body: body === undefined ? undefined : JSON.stringify(body),
+        });
+        return {
+          status: response.status,
+          body: response.status === 204 ? null : await response.json(),
+          cookie: response.headers
+            .getSetCookie()
+            .map((cookie) => cookie.split(";")[0])
+            .join("; "),
+        };
+      }
+      const users = [];
+      for (const [index, email] of emails.entries()) {
+        const result = await request("/auth/sign-up/email", "POST", {
+          name: ["Student owner", "Named mentor", "Unrelated account"][index],
+          email,
+          password: "selected session study passphrase 2026",
+        });
+        assert.equal(result.status, 200, JSON.stringify(result.body));
+        users.push(result);
+      }
+      const [owner, mentor, other] = users;
+      const mentorProfile = await request("/sharing/profile", "GET", undefined, mentor.cookie);
+      const otherProfile = await request("/sharing/profile", "GET", undefined, other.cookie);
+      assert(!JSON.stringify(mentorProfile.body).includes("@"));
+      const profile = await request(
+        `/sharing/recipient?code=${mentorProfile.body.code}`,
+        "GET",
+        undefined,
+        owner.cookie
+      );
+      assert.equal(profile.body.name, "Named mentor");
+      assert.equal((await request("/shared-sessions")).status, 401);
+      const flow = (
+        await request(
+          "/flows",
+          "POST",
+          {
+            title: "Private source library",
+            tag: "Physics",
+            blocks: [{ title: "Private planned recall", type: "recall", durationMinutes: 1 }],
+          },
+          owner.cookie
+        )
+      ).body;
+      const session = {
+        id: "sharing-private-session",
+        flowId: flow.id,
+        flowTitle: "Historical private session",
+        flowTag: "Physics",
+        subject: "Physics",
+        startedAt: new Date(Date.now() - 120000).toISOString(),
+        durationMinutes: 1,
+        focusMinutes: 1,
+        status: "completed",
+        blocks: flow.blocks,
+      };
+      assert.equal((await request("/sessions", "POST", session, owner.cookie)).status, 201);
+      const reflection = {
+        comprehension: 4,
+        fatigue: 2,
+        notes: "Private reflection never included by default",
+      };
+      await request(`/sessions/${session.id}/log`, "PUT", reflection, owner.cookie);
+      const path = `/sessions/${session.id}/shares`;
+      assert.equal(
+        (
+          await request(
+            path,
+            "POST",
+            { recipientCode: mentorProfile.body.code, includeReflection: false },
+            owner.cookie,
+            "https://untrusted.example"
+          )
+        ).status,
+        403
+      );
+      assert.equal(
+        (
+          await request(
+            path,
+            "POST",
+            { recipientCode: mentorProfile.body.code, includeReflection: false },
+            other.cookie
+          )
+        ).status,
+        404
+      );
+      assert.equal(
+        (
+          await request(
+            path,
+            "POST",
+            { recipientCode: "invalid", includeReflection: false },
+            owner.cookie
+          )
+        ).status,
+        400
+      );
+      const created = await request(
+        path,
+        "POST",
+        {
+          recipientCode: mentorProfile.body.code,
+          includeReflection: false,
+          ownerId: other.body.user.id,
+        },
+        owner.cookie
+      );
+      assert.equal(created.status, 200, JSON.stringify(created.body));
+      const shareId = created.body.id;
+      assert.equal(created.body.recipient.name, "Named mentor");
+      const retry = await request(
+        path,
+        "POST",
+        { recipientCode: mentorProfile.body.code, includeReflection: false },
+        owner.cookie
+      );
+      assert.equal(retry.body.id, shareId);
+      assert.equal(await db.sessionShare.count({ where: { ownerId: owner.body.user.id } }), 1);
+      const received = await request("/shared-sessions", "GET", undefined, mentor.cookie);
+      assert.equal(received.body.total, 1);
+      assert(!JSON.stringify(received.body).includes(reflection.notes));
+      let detail = await request(`/shared-sessions/${shareId}`, "GET", undefined, mentor.cookie);
+      assert.equal(detail.status, 200);
+      assert.equal(detail.body.session.reflection, undefined);
+      assert.equal(detail.body.session.id, undefined);
+      assert.equal(detail.body.session.flowId, undefined);
+      assert(!JSON.stringify(detail.body).includes(reflection.notes));
+      assert.equal(
+        (await request(`/shared-sessions/${shareId}`, "GET", undefined, other.cookie)).status,
+        404
+      );
+      for (const [endpoint, method, body] of [
+        [`/sessions/${session.id}`, "GET", undefined],
+        [`/sessions/${session.id}/log`, "PUT", reflection],
+        [`/flows/${flow.id}`, "DELETE", undefined],
+        [path, "GET", undefined],
+        [path, "POST", { recipientCode: otherProfile.body.code, includeReflection: true }],
+        [`${path}/${shareId}`, "PUT", { includeReflection: true }],
+        [`${path}/${shareId}`, "DELETE", undefined],
+      ] as const)
+        assert.equal((await request(endpoint, method, body, mentor.cookie)).status, 404, endpoint);
+      assert.equal(
+        (await request("/workspace", "GET", undefined, mentor.cookie)).body.sessions.length,
+        0
+      );
+      assert.equal(
+        (await request("/reports/summary", "GET", undefined, mentor.cookie)).body.count,
+        0
+      );
+      await request(`/flows/${flow.id}`, "DELETE", undefined, owner.cookie);
+      assert.equal(
+        (await request(`/shared-sessions/${shareId}`, "GET", undefined, mentor.cookie)).body.session
+          .blocks[0].title,
+        "Private planned recall"
+      );
+      assert.equal(
+        (await request(`${path}/${shareId}`, "PUT", { includeReflection: true }, owner.cookie))
+          .status,
+        200
+      );
+      await request(
+        `/sessions/${session.id}/log`,
+        "PUT",
+        { ...reflection, notes: "Updated explicitly shared notes" },
+        owner.cookie
+      );
+      detail = await request(`/shared-sessions/${shareId}`, "GET", undefined, mentor.cookie);
+      assert.equal(detail.body.session.reflection.notes, "Updated explicitly shared notes");
+      assert.equal(
+        (await request(`${path}/${shareId}`, "PUT", { includeReflection: false }, owner.cookie))
+          .status,
+        200
+      );
+      assert.equal(
+        (await request(`/shared-sessions/${shareId}`, "GET", undefined, mentor.cookie)).body.session
+          .reflection,
+        undefined
+      );
+      assert.equal(
+        (await request(`${path}/${shareId}`, "DELETE", undefined, owner.cookie)).status,
+        204
+      );
+      assert.equal(
+        (await request(`/shared-sessions/${shareId}`, "GET", undefined, mentor.cookie)).status,
+        404
+      );
+      assert.equal(
+        (await request("/shared-sessions", "GET", undefined, mentor.cookie)).body.total,
+        0
+      );
+      assert.equal(
+        (await request(`/sessions/${session.id}`, "GET", undefined, owner.cookie)).body.reflection
+          .notes,
+        "Updated explicitly shared notes"
+      );
+      // Backups deliberately contain study data, never permission grants.
+      const target = (await request("/workspace", "GET", undefined, other.cookie)).body;
+      const injected = {
+        ...target,
+        shares: [
+          { ownerId: owner.body.user.id, sessionId: session.id, recipientId: other.body.user.id },
+        ],
+      };
+      const review = await reviewWorkspaceImport(target, injected, other.body.user.id);
+      assert.equal(
+        (
+          await request(
+            "/workspace/import",
+            "POST",
+            { workspace: injected, reviewToken: review.token },
+            other.cookie
+          )
+        ).status,
+        200
+      );
+      assert.equal(
+        (await request("/shared-sessions", "GET", undefined, other.cookie)).body.total,
+        0
+      );
+      // Page more than 25 grants without exposing any unshared reflection.
+      await new AccountWorkspace(db, owner.body.user.id).update((data) => {
+        data.sessions.push(
+          ...Array.from({ length: 26 }, (_, index) => ({
+            ...session,
+            id: `share-page-session-${index}`,
+            status: "completed" as const,
+            hasReflection: false,
+          }))
+        );
+      });
+      await db.sessionShare.createMany({
+        data: Array.from({ length: 26 }, (_, index) => ({
+          id: `share-page-${index}`,
+          ownerId: owner.body.user.id,
+          sessionId: `share-page-session-${index}`,
+          recipientId: mentor.body.user.id,
+          includeReflection: false,
+        })),
+      });
+      const page1 = (await request("/shared-sessions", "GET", undefined, mentor.cookie)).body;
+      const page2 = (await request("/shared-sessions?offset=25", "GET", undefined, mentor.cookie))
+        .body;
+      assert.equal(page1.total, 26);
+      assert.equal(page1.items.length, 25);
+      assert.equal(page1.nextOffset, 25);
+      assert.equal(page2.items.length, 1);
+      assert(
+        !page1.items.some((first: { id: string }) =>
+          page2.items.some((second: { id: string }) => first.id === second.id)
+        )
+      );
+      await assert.rejects(
+        db.sessionShare.create({
+          data: {
+            ownerId: mentor.body.user.id,
+            sessionId: session.id,
+            recipientId: other.body.user.id,
+          },
+        })
+      );
+      await request(
+        path,
+        "POST",
+        { recipientCode: mentorProfile.body.code, includeReflection: false },
+        owner.cookie
+      );
+      await db.user.delete({ where: { id: mentor.body.user.id } });
+      assert.equal(await db.sessionShare.count({ where: { ownerId: owner.body.user.id } }), 0);
+      assert(
+        await db.studySession.findUnique({
+          where: { userId_id: { userId: owner.body.user.id, id: session.id } },
+        })
+      );
+      await request(
+        path,
+        "POST",
+        { recipientCode: otherProfile.body.code, includeReflection: false },
+        owner.cookie
+      );
+      await db.user.delete({ where: { id: owner.body.user.id } });
+      assert.equal(await db.sessionShare.count({ where: { recipientId: other.body.user.id } }), 0);
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await db.user.deleteMany({ where: { email: { in: emails } } }).catch(() => {});
+      await db.$disconnect();
+      await postgres?.close();
+    }
+  }
+);

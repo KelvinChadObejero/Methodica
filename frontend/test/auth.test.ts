@@ -36,3 +36,37 @@ test("private 401 clears account state, while rejected login keeps the form reco
     else Reflect.deleteProperty(globalThis, "window");
   }
 });
+
+test("a delayed rejection from the previous account does not expire the current account", async (t) => {
+  const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+  const events = new EventTarget();
+  Object.defineProperty(globalThis, "window", { value: events, configurable: true });
+  let expired = 0;
+  events.addEventListener("methodica-session-expired", () => expired++);
+  let complete!: (response: Response) => void;
+  t.mock.method(
+    globalThis,
+    "fetch",
+    () =>
+      new Promise<Response>((resolve) => {
+        complete = resolve;
+      })
+  );
+  try {
+    setAccountScope("previous-student");
+    const pending = api("/shared-sessions");
+    setAccountScope("current-student");
+    complete(
+      new Response(JSON.stringify({ message: "The active account changed." }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      })
+    );
+    await assert.rejects(pending, /account changed/);
+    assert.equal(expired, 0);
+  } finally {
+    setAccountScope(null);
+    if (originalWindow) Object.defineProperty(globalThis, "window", originalWindow);
+    else Reflect.deleteProperty(globalThis, "window");
+  }
+});

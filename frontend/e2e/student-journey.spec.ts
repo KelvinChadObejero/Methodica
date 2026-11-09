@@ -244,6 +244,106 @@ test("student builds, completes two blocks, recovers a failed reflection and reo
     data: { comprehension: 1, fatigue: 1, notes: "unauthorized" },
   });
   expect(denied.status()).toBe(404);
+  // Explicit selected-session mentor access never becomes library ownership.
+  await bob.getByRole("button", { name: "Shared with me", exact: true }).click();
+  const mentorCode = await bob.getByLabel("My account code", { exact: true }).inputValue();
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.getByRole("button", { name: "Session History", exact: true }).click();
+  let failPermissionRead = true,
+    loseShareResponse = true;
+  await page.route("**/api/sessions/*/shares", async (route) => {
+    if (route.request().method() === "GET" && failPermissionRead) {
+      return route.fulfill({ status: 503, json: { message: "Temporary permissions failure" } });
+    }
+    if (route.request().method() === "POST" && loseShareResponse) {
+      loseShareResponse = false;
+      const committed = await route.fetch();
+      expect(committed.status()).toBe(200);
+      return route.fulfill({ status: 503, json: { message: "Share success response lost" } });
+    }
+    return route.continue();
+  });
+  await page.getByRole("button", { name: "Share session", exact: true }).click();
+  const sharing = page.getByRole("region", { name: "Share only this session.", exact: true });
+  await expect(sharing.getByRole("alert")).toBeVisible();
+  await expect(
+    sharing.getByText("No one else has access to this session.", { exact: true })
+  ).toHaveCount(0);
+  failPermissionRead = false;
+  await sharing.getByRole("button", { name: "Refresh permissions", exact: true }).click();
+  await sharing.getByLabel("Mentor account code", { exact: true }).fill(mentorCode);
+  await sharing.getByRole("button", { name: "Find account", exact: true }).click();
+  await expect(sharing.getByText(/Named account:/)).toContainText("Another student");
+  await expect(
+    sharing.getByRole("button", { name: "Confirm read-only sharing", exact: true })
+  ).toBeDisabled();
+  await expect(
+    sharing.getByLabel("Include reflection notes and ratings, including later updates", {
+      exact: true,
+    })
+  ).not.toBeChecked();
+  await sharing.getByLabel("Share only this session with Another student", { exact: true }).check();
+  await sharing.getByRole("button", { name: "Confirm read-only sharing", exact: true }).click();
+  await expect(sharing.getByRole("alert")).toBeVisible();
+  await expect(
+    sharing.getByText("No one else has access to this session.", { exact: true })
+  ).toHaveCount(0);
+  await sharing.getByRole("button", { name: "Refresh permissions", exact: true }).click();
+  await expect(sharing.locator(".sharing-grant")).toHaveCount(1);
+  await sharing.getByRole("button", { name: "Confirm read-only sharing", exact: true }).click();
+  await expect(sharing.getByRole("status")).toContainText("shared read-only");
+  expect(
+    await (await page.request.get(`/api/sessions/${saved.sessions[0].id}/shares`)).json()
+  ).toHaveLength(1);
+  await bob.setViewportSize({ width: 375, height: 812 });
+  await bob.getByRole("button", { name: "Refresh shared list", exact: true }).click();
+  await bob.getByRole("button", { name: "View shared session", exact: true }).click();
+  const shared = bob.getByRole("article", { name: "Read-only shared session", exact: true });
+  await expect(
+    shared.getByText("Reflection notes and ratings are not shared.", { exact: true })
+  ).toBeVisible();
+  await expect(shared.getByRole("button", { name: /Edit|Save|Publish|Delete/ })).toHaveCount(0);
+  await sharing.getByLabel("Include reflection for Another student", { exact: true }).check();
+  await sharing.getByRole("button", { name: "Update access", exact: true }).click();
+  await expect(sharing.getByRole("status")).toContainText("permissions updated");
+  await bob.getByRole("button", { name: "Refresh shared session", exact: true }).click();
+  await expect(shared).toContainText("Updated after re-login");
+  expect(
+    (
+      await bob.request.put(`/api/sessions/${saved.sessions[0].id}/log`, {
+        headers: { Origin: new URL(bob.url()).origin },
+        data: { comprehension: 1, fatigue: 1, notes: "Still unauthorized" },
+      })
+    ).status()
+  ).toBe(404);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  expect(await bob.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.locator("#main-content").focus();
+  await page.screenshot({ path: testInfo.outputPath("mobile-sharing-owner.png"), fullPage: true });
+  await bob.locator("#main-content").focus();
+  await bob.screenshot({
+    path: testInfo.outputPath("mobile-read-only-mentor.png"),
+    fullPage: true,
+  });
+  await sharing.getByLabel("Include reflection for Another student", { exact: true }).uncheck();
+  await sharing.getByRole("button", { name: "Update access", exact: true }).click();
+  await expect(sharing.getByRole("status")).toContainText("permissions updated");
+  await bob.getByRole("button", { name: "Refresh shared session", exact: true }).click();
+  await expect(
+    shared.getByText("Reflection notes and ratings are not shared.", { exact: true })
+  ).toBeVisible();
+  await sharing
+    .getByRole("button", { name: "Revoke Another student's access", exact: true })
+    .click();
+  await expect(sharing.getByRole("status")).toContainText("Access revoked");
+  await bob.getByRole("button", { name: "Refresh shared session", exact: true }).click();
+  await expect(bob.getByRole("alert")).toContainText("no longer shared");
+  await expect(shared).toHaveCount(0);
+  await bob.getByRole("button", { name: "Refresh shared list", exact: true }).click();
+  await expect(
+    bob.getByRole("heading", { name: "No sessions shared yet.", exact: true })
+  ).toBeVisible();
+  expect((await (await page.request.get("/api/workspace")).json()).sessions).toHaveLength(1);
   await bobContext.close();
 });
 

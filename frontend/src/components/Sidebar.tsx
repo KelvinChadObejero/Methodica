@@ -12,6 +12,7 @@ const SHOULD_HAVE_ITEMS: NavEntry[] = [
   { screen: "sync", label: "Workspace Connection", enabled: true },
   { screen: "community", label: "Community Hub", enabled: true },
   { screen: "reflect", label: "Reflection", enabled: true },
+  { screen: "shared", label: "Shared with me", enabled: true },
   { screen: "settings", label: "Settings", enabled: true },
   { screen: "crud-demo", label: "Classroom CRUD Demo", enabled: true },
 ];

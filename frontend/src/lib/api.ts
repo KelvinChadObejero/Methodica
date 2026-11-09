@@ -12,6 +12,7 @@ export function setAccountScope(id: string | null) {
 }
 
 export async function api<T>(path: string, method = "GET", body?: unknown): Promise<T> {
+  const requestedAccount = accountId;
   let response: Response;
   try {
     response = await fetch(`/api${path}`, {
@@ -19,7 +20,9 @@ export async function api<T>(path: string, method = "GET", body?: unknown): Prom
       credentials: "same-origin",
       headers: {
         ...(body === undefined ? {} : { "Content-Type": "application/json" }),
-        ...(accountId && !path.startsWith("/auth/") ? { "X-Methodica-Account": accountId } : {}),
+        ...(requestedAccount && !path.startsWith("/auth/")
+          ? { "X-Methodica-Account": requestedAccount }
+          : {}),
       },
       body: body === undefined ? undefined : JSON.stringify(body),
       signal: AbortSignal.timeout(15000),
@@ -28,7 +31,7 @@ export async function api<T>(path: string, method = "GET", body?: unknown): Prom
     throw new Error("Could not reach the study service. Check your connection and try again.");
   }
   if (!response.ok) {
-    if (response.status === 401 && !path.startsWith("/auth/"))
+    if (response.status === 401 && !path.startsWith("/auth/") && requestedAccount === accountId)
       window.dispatchEvent(new Event("methodica-session-expired"));
     const error = await response.json().catch(() => null);
     throw new ApiError(

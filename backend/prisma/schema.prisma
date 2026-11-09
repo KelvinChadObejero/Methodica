@@ -8,18 +8,19 @@ datasource db {
 }
 
 model User {
-  id            String         @id
-  name          String
-  email         String         @unique
-  emailVerified Boolean        @default(false)
-  image         String?
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  sessions      Session[]
-  accounts      Account[]
-  workspace     Workspace?
-  studyFlows    StudyFlow[]
-  studySessions StudySession[]
+  id             String         @id
+  name           String
+  email          String         @unique
+  emailVerified  Boolean        @default(false)
+  image          String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  sessions       Session[]
+  accounts       Account[]
+  workspace      Workspace?
+  studyFlows     StudyFlow[]
+  studySessions  StudySession[]
+  receivedShares SessionShare[]
 
   @@map("user")
 }
@@ -84,13 +85,13 @@ model RateLimit {
 // Transaction lock and compatibility mirror for older deployments. The digest
 // detects writes by the previous JSON adapter during a rolling upgrade/rollback.
 model Workspace {
-  userId           String   @id
-  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId           String    @id
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   data             Json
-  updatedAt        DateTime @updatedAt
+  updatedAt        DateTime  @updatedAt
   normalizedDigest String?
   normalizedAt     DateTime?
-  revision         Int      @default(0)
+  revision         Int       @default(0)
 }
 
 enum FlowKind {
@@ -174,6 +175,7 @@ model StudySession {
   timingSource    String?
   blocks          Json?
   execution       Json?
+  shares          SessionShare[]
   log             SessionLog?
 
   @@id([userId, id])
@@ -193,4 +195,19 @@ model SessionLog {
   notes           String
 
   @@id([userId, sessionId])
+}
+
+model SessionShare {
+  id                String       @id @default(uuid())
+  ownerId           String
+  sessionId         String
+  recipientId       String
+  includeReflection Boolean      @default(false)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  session           StudySession @relation(fields: [ownerId, sessionId], references: [userId, id], onDelete: Cascade)
+  recipient         User         @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@unique([ownerId, sessionId, recipientId])
+  @@index([recipientId, createdAt, id])
 }

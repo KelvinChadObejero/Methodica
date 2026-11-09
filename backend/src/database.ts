@@ -98,7 +98,7 @@ async function readStudyData(tx: Transaction, userId: string, recent?: number): 
   };
 }
 
-function sessionFromRow(
+export function sessionFromRow(
   row: Prisma.StudySessionGetPayload<{ include: { log: true } }>
 ): SessionLog {
   return {
@@ -316,7 +316,7 @@ export class AccountWorkspace implements WorkspaceStore {
 
   // Avoid reading/hash-checking the compatibility JSON on every history page.
   // A row lock also keeps items, counts, and revision in one coherent snapshot.
-  private async query<T>(read: (tx: Transaction, revision: number) => Promise<T>) {
+  async withAccountLock<T>(read: (tx: Transaction, revision: number) => Promise<T>) {
     await this.initialize();
     return this.db.$transaction(
       async (tx) => {
@@ -348,11 +348,11 @@ export class AccountWorkspace implements WorkspaceStore {
   }
 
   async overview() {
-    return this.query(async (tx) => readStudyData(tx, this.userId, 25));
+    return this.withAccountLock(async (tx) => readStudyData(tx, this.userId, 25));
   }
 
   async session(id: string) {
-    return this.query(async (tx) => {
+    return this.withAccountLock(async (tx) => {
       const row = await tx.studySession.findUnique({
         where: { userId_id: { userId: this.userId, id } },
         include: { log: true },
@@ -362,7 +362,7 @@ export class AccountWorkspace implements WorkspaceStore {
   }
 
   async history(query: HistoryQuery): Promise<HistoryPage> {
-    return this.query(async (tx, revision) => {
+    return this.withAccountLock(async (tx, revision) => {
       if (query.revision !== undefined && query.revision !== revision)
         throw new WorkspaceImportError(
           "Your history changed. Return to the first page to see the latest sessions.",
@@ -407,7 +407,7 @@ export class AccountWorkspace implements WorkspaceStore {
   }
 
   async report(query: ReportQuery): Promise<StudyReport> {
-    return this.query(async (tx, revision) => {
+    return this.withAccountLock(async (tx, revision) => {
       const until = new Date(query.until);
       // startedAt is a UTC TIMESTAMP WITHOUT TIME ZONE. Convert it explicitly
       // before grouping by the requested local calendar date (including DST).
@@ -446,7 +446,7 @@ export class AccountWorkspace implements WorkspaceStore {
   }
 
   async reportSessions(query: ReportQuery, revision: number) {
-    return this.query(async (tx, current) => {
+    return this.withAccountLock(async (tx, current) => {
       if (current !== revision)
         throw new WorkspaceImportError(
           "Your sessions changed. Refresh the report before exporting.",

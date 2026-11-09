@@ -1931,6 +1931,14 @@ button:disabled {
 .snapshot-detail { margin: 12px 0; color: var(--ink-soft); overflow-wrap: anywhere; }
 .snapshot-detail summary { cursor: pointer; }
 .snapshot-detail li { margin-top: 6px; }
+.sharing-panel { border-top: 1px solid var(--line); margin-top: 18px; padding-top: 18px; overflow-wrap: anywhere; }
+.sharing-panel input:not([type="checkbox"]) { width: 100%; margin: 8px 0 12px; }
+.sharing-panel .checkbox-label { align-items: flex-start; margin: 12px 0; }
+.sharing-review, .sharing-grant { border-top: 1px solid var(--line); margin-top: 16px; padding-top: 12px; }
+.sharing-panel h4 { font-size: 18px; margin: 0 0 12px; }
+.sharing-panel form, .sharing-review, .sharing-grant, .shared-detail { min-width: 0; }
+.shared-detail { margin-top: 24px; overflow-wrap: anywhere; }
+.shared-detail li { margin-top: 8px; }
 .day-value,
 .day-label {
   font-size: 10px;

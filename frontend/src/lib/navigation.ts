@@ -8,6 +8,7 @@ const screens: Screen[] = [
   "community",
   "reflect",
   "history",
+  "shared",
   "settings",
   "timer",
   "login",
