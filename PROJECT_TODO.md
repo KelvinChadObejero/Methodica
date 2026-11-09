@@ -2,9 +2,11 @@
 
 Updated 2026-11-10. For Kelvin and Andrei. This is the working backlog; update it in the same PR as the work. The [original review roadmap](docs/REVIEW_ROADMAP.md) is retained as a reference, not a second status tracker.
 
-Current implementation: **M1-02** (explicit, revocable read-only sharing of selected sessions with a named mentor), on `codex/mentor-session-permissions`. The maintainer approved selected-session access on 2026-11-09; private reflection content remains opt-in. **DB-03, M5-02, S4-02 and M4-02** are merged and deployed in [PR #7](https://github.com/KelvinChadObejero/Methodica/pull/7), [PR #8](https://github.com/KelvinChadObejero/Methodica/pull/8) and [PR #9](https://github.com/KelvinChadObejero/Methodica/pull/9), with [production verification](docs/RELEASE_VERIFICATION.md). **AUTH-RECOVERY depends on an owned, verified sender domain**: Resend was selected, but no domain is owned yet. Vercel CLI is connected; Resend is not provisioned.
+Latest release: **M1-02 and RELEASE-01 are done** in [PR #11](https://github.com/KelvinChadObejero/Methodica/pull/11), deployed and verified on production on 2026-11-10. Students explicitly share selected sessions with a named mentor, read-only and revocable; reflection content remains opt-in. The full two-block student journey also passed, including re-login, a separate browser and account isolation. **DB-03, M5-02, S4-02 and M4-02** were released in [PR #7](https://github.com/KelvinChadObejero/Methodica/pull/7), [PR #8](https://github.com/KelvinChadObejero/Methodica/pull/8) and [PR #9](https://github.com/KelvinChadObejero/Methodica/pull/9). See [production verification](docs/RELEASE_VERIFICATION.md).
 
-Released: **DB-01, DB-02, WEB-01, M2-02, M3-02 and S3-02** are done in [PR #5](https://github.com/KelvinChadObejero/Methodica/pull/5), squash-merged and deployed on 2026-11-09 after source review, green CI and maintainer authorization. [Production verification](docs/RELEASE_VERIFICATION.md) confirms a complete two-block session, reflection, re-login, a second browser and account isolation. See [the data model](docs/DATA_MODEL.md) and [the class demo/browser-test guide](docs/CLASS_DEMO.md). QA-02 automation is implemented; manual screen-reader/contrast review and three-classmate testing remain open. Both packages pass lint/tests/build; 22 frontend tests, 13 API/database tests and 5 Chromium journeys pass, including failed saves, expiry recovery and 375px layouts.
+Remaining: **8 of the 20 milestone-table tasks**, plus the named **AUTH-RECOVERY** dependency and **3 later enhancements** (12 open named entries; recovery overlaps M1-01). **OPS-01** is the next release priority: separate preview storage, prove backup/restore and finish operational acceptance. **AUTH-RECOVERY depends on an owned, verified sender domain**: Resend was selected, but no domain is owned yet. Vercel CLI is connected; Resend is not provisioned.
+
+Released: **DB-01, DB-02, WEB-01, M2-02, M3-02 and S3-02** are done in [PR #5](https://github.com/KelvinChadObejero/Methodica/pull/5), squash-merged and deployed on 2026-11-09 after source review, green CI and maintainer authorization. See [the data model](docs/DATA_MODEL.md) and [the class demo/browser-test guide](docs/CLASS_DEMO.md). QA-02 automation is implemented; manual screen-reader/contrast review, physical-device and three-classmate testing remain open. Both packages pass lint/tests/build; 23 frontend tests, 14 API/database tests and 5 Chromium journeys pass, including failed saves, expiry recovery, sharing failures and 375px layouts.
 
 The proposal v2 specifies React + TypeScript on web, React Native + Expo on mobile, and Node.js + Express + TypeScript with PostgreSQL and Prisma. Sections 7.2–7.3 and 13.2 establish the backend direction, with a caveat for instructor requirements. Keep the two Spring Boot projects as separate classroom assignments. Do not connect the website to two production APIs.
 
@@ -42,19 +44,21 @@ These entries record the original local groundwork. Account deployment status is
 
 ## Next milestone: private student workspace
 
-The private study workspace is deployed with normalized PostgreSQL/Prisma entities and enforced ownership. The file workspace is an explicit local-only adapter. Email recovery, mentor permissions, environment separation and the broader release acceptance remain below.
+The private study workspace is deployed with normalized PostgreSQL/Prisma entities, enforced ownership and explicit selected-session sharing. The file workspace is an explicit local-only adapter. Email recovery, environment separation and broader operational/manual acceptance remain below.
 
 | ID         | Priority | Suggested owner / reviewer | Status | Depends on    | Acceptance criteria                                                                                                                                                                                                   |
 | ---------- | -------- | -------------------------- | ------ | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | DB-01      | P0       | Both                       | Done | —             | Finalize the six-entity PostgreSQL schema: User, StudyFlow, ordered StudyBlock, StudyType, StudySession, SessionLog. Record ownership, template metadata, session snapshots, and deletion rules.                      |
 | DB-02      | P0       | Andrei / Kelvin            | Done | DB-01         | Add Prisma schema, repeatable migrations and seed. Fresh database setup works from the README. Restart and transaction tests use PostgreSQL. Replace the file adapter; do not silently fall back to it in production. |
 | M1-01      | P0       | Andrei / Kelvin            | In progress  | DB-02         | Register, sign in/out, recover access; library-managed password hashes and revocable/expiring sessions (see AUTH.md for the Better Auth decision). Registration cannot grant privileged roles.                                                    |
-| M1-02      | P0       | Andrei / Kelvin            | In review  | M1-01         | Every private flow/session/reflection query enforces owner access. Two-user tests prove another user's IDs cannot be read, changed, exported or deleted. Mentor access follows an explicit permission rule.           |
+| M1-02      | P0       | Andrei / Kelvin            | Done  | M1-01         | Every private flow/session/reflection query enforces owner access. Two-user tests prove another user's IDs cannot be read, changed, exported or deleted. Mentor access follows an explicit permission rule.           |
 | WEB-01     | P0       | Kelvin / Andrei            | Done | M1-01         | Account screens, protected routes, expired-session recovery, useful loading/error states. Draft study work survives a recoverable request failure.                                                                    |
 | DB-03      | P0       | Both                       | Done | DB-02         | Decide how to import existing local workspace exports and legacy `methodica-sessions` browser records without overwriting, duplicating or attributing them to the wrong account. Test malformed imports.              |
-| RELEASE-01 | P0       | Both                       | In progress | M1-02, WEB-01 | New student signs in, builds a two-block flow, completes it, saves a reflection, signs out/in, and finds the same session/reflection. Repeat with a second account and device.                                        |
+| RELEASE-01 | P0       | Both                       | Done | M1-02, WEB-01 | New student signs in, builds a two-block flow, completes it, saves a reflection, signs out/in, and finds the same session/reflection. Repeat with a second account and device.                                        |
 
 Do not mark RELEASE-01 done based only on a screen looking complete. It requires the whole journey, persisted database records, and ownership tests.
+
+M1-02 and RELEASE-01 evidence: [selected-session sharing](docs/MENTOR_SHARING.md) and [the exact production revision and live journey](docs/RELEASE_VERIFICATION.md). RELEASE-01 closes this private student journey; QA-02 and OPS-01 still govern broader release readiness.
 
 ## Finish the proposed MVP
 
@@ -67,7 +71,7 @@ Do not mark RELEASE-01 done based only on a screen looking complete. It requires
 | S3-02 | P1       | Kelvin / Andrei            | Done | M1-02        | Reflections are private, one per session, update safely and survive re-login. Failed saves retain the user's notes.                                                                                                                                       |
 | S4-02 | P1       | Kelvin (proposed) / Andrei | Done  | M5-02        | Aggregate analytics in the API for large histories; agree on timezone, active-day/streak rules and partial-session treatment. Charts and exports agree for the same date range.                                                                           |
 
-History/report implementation and acceptance evidence: [HISTORY_REPORTS.md](docs/HISTORY_REPORTS.md). Planned snapshots are stored; execution events remain M4-02.
+History/report implementation and acceptance evidence: [HISTORY_REPORTS.md](docs/HISTORY_REPORTS.md). Planned snapshots and [block execution events](docs/TIMER_EXECUTION.md) are released.
 
 ## Enhancements after the core journey
 

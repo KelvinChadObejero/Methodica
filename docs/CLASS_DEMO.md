@@ -32,6 +32,14 @@ validation is exercised. Screenshots and failure traces are in
 7. Open a second account. Show that its flows/history/reflections are separate.
 8. If useful, demonstrate the existing explicit device-data review/import and
    retry without duplicate sessions. Device work stays separate until confirmed.
+9. In the second account, open **Shared with me** and copy its account code.
+   Back in the student's Session History, choose **Share session**, find that
+   named account and explicitly confirm sharing only this session. Keep
+   reflection sharing unchecked to demonstrate the private default.
+10. Refresh **Shared with me** in the second account. Show read-only access;
+    then opt the reflection in/out from the student account and refresh the
+    recipient's view. Revoke access and show that the next read is denied.
+    See [the mentor sharing guide](MENTOR_SHARING.md) for the exact boundaries.
 
 ## Recovery and boundaries
 
@@ -41,9 +49,10 @@ an unsaved form; a failed save retains input. A recovery copy is not a database
 save, does not sync to another device, and disappears when that tab is closed.
 Blocked storage produces a warning. Another account does not load the draft.
 
-Email verification/password reset, mentor permissions, public community posts,
-live sync and mobile remain follow-up work. Hosted verification and partner
-review must be completed separately before calling this a production release.
+Email verification/password reset, public community posts, live sync and mobile
+remain follow-up work. Selected-session mentor access is implemented; it does
+not grant a global mentor role. Hosted checks for each released revision are
+recorded in [release verification](RELEASE_VERIFICATION.md).
 
 For QA-02 in class, ask three classmates to create and start a two-block flow
 without help. Record where they hesitate, keyboard/mobile issues and fixes.
