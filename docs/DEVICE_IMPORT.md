@@ -14,7 +14,7 @@ If the connection fails after a save, leave the browser data alone and review ag
 
 ## Boundaries
 
-The device section imports the current `methodica-device-workspace-v1` workspace. The backup section below it also accepts Methodica JSON exports and older session records, as described below. Version, IDs, unique records, blocks, dates, durations and reflection fields are validated before writing. The import is limited to 8 MB per request and the existing account limits of 100 flows, 5,000 sessions and 200 private templates. A failed validation/limit check rejects the entire import; it never silently truncates data.
+The device section imports the current `methodica-device-workspace-v1` workspace. The backup section below it also accepts Methodica JSON exports and older session records, as described below. Version, IDs, unique records, blocks, dates, durations and reflection fields are validated before writing. The import is limited to 4 MB per request and the existing account limits of 100 flows, 5,000 sessions and 200 private templates. A failed validation/limit check rejects the entire import; it never silently truncates data.
 
 ## Backup files and older browser sessions (DB-03)
 

@@ -1,7 +1,8 @@
 import type { Workspace, StudyFlow, StudyFlowTemplate, SessionLog } from "./domain.js";
 import { studyTypes } from "./seed.js";
 
-export const MAX_IMPORT_BYTES = 8 * 1024 * 1024;
+// Stay below Vercel's 4.5 MB request cap, including the review envelope.
+export const MAX_IMPORT_BYTES = 4 * 1024 * 1024;
 export class WorkspaceImportError extends Error {
   constructor(
     message: string,
@@ -146,7 +147,7 @@ export function validateImportWorkspace(value: unknown): Workspace {
     throw new WorkspaceImportError("This workspace version is not supported.");
   if (new TextEncoder().encode(JSON.stringify(value)).byteLength > MAX_IMPORT_BYTES - 1024)
     throw new WorkspaceImportError(
-      "This device workspace is too large to import at once (8 MB). Export a backup in Settings; your data has not been changed.",
+      "This workspace is too large to import at once (4 MB). Export a backup in Settings; your data has not been changed.",
       413
     );
   return {

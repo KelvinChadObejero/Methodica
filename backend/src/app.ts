@@ -10,6 +10,7 @@ import { accountServices, type AccountServices } from "./auth.js";
 import { AccountWorkspace, type WorkspaceStore } from "./database.js";
 import {
   canonical,
+  MAX_IMPORT_BYTES,
   hasImportAdditions,
   planWorkspaceImport,
   reviewWorkspaceImport,
@@ -128,7 +129,7 @@ export function createApp(options: { dataFile?: string; accounts?: AccountServic
           });
         }
   );
-  app.post("/api/workspace/import", express.json({ limit: "8mb" }));
+  app.post("/api/workspace/import", express.json({ limit: MAX_IMPORT_BYTES }));
   app.use(express.json({ limit: "256kb" }));
   // These endpoints contain only the public catalog and starter content. They
   // remain available without a database; private workspace routes fail closed.

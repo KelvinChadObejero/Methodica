@@ -56,7 +56,7 @@ async function legacyWorkspace(values: unknown[]): Promise<Workspace> {
 export async function parseBackup(raw: string): Promise<BackupSource> {
   if (new TextEncoder().encode(raw).byteLength > MAX_IMPORT_BYTES - 1024)
     throw new Error(
-      "The backup exceeds the 8 MB import limit. Your account and browser data were not changed."
+      "The backup exceeds the 4 MB import limit. Your account and browser data were not changed."
     );
   let value: unknown;
   try {

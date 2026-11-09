@@ -77,7 +77,7 @@ test("malformed, ambiguous, duplicate and oversized backups reject the whole imp
   ])
     await assert.rejects(parseBackup(JSON.stringify(payload)));
   await assert.rejects(parseBackup("id,flow,duration\n1,old,25"), /valid JSON/);
-  await assert.rejects(parseBackup(" ".repeat(8 * 1024 * 1024)), /8 MB/);
+  await assert.rejects(parseBackup(" ".repeat(4 * 1024 * 1024)), /4 MB/);
   const forged = initialWorkspace();
   forged.sessions = [
     {

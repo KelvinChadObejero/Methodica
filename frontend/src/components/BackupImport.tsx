@@ -35,7 +35,7 @@ export default function BackupImport() {
     setBusy(true);
     try {
       if (file.size > MAX_IMPORT_BYTES - 1024)
-        throw new Error("Choose a JSON backup smaller than 8 MB.");
+        throw new Error("Choose a JSON backup smaller than 4 MB.");
       setSource({ ...(await parseBackup(await file.text())), label: file.name });
     } catch (cause) {
       setError(errorMessage(cause));
