@@ -1,6 +1,19 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Dialog, type Page } from "@playwright/test";
 
 const password = "class demo study passphrase 2026";
+async function reloadAcceptingDialogs(page: Page) {
+  const handled: Promise<void>[] = [];
+  const accept = (dialog: Dialog) => {
+    handled.push(dialog.accept());
+  };
+  page.on("dialog", accept);
+  try {
+    await page.reload();
+    await Promise.all(handled);
+  } finally {
+    page.off("dialog", accept);
+  }
+}
 async function register(page: Page, name: string, email: string) {
   await page.goto("/#register");
   await page.getByLabel("Your name").fill(name);
@@ -59,11 +72,12 @@ test("student builds, completes two blocks, recovers a failed reflection and reo
   });
   await page.getByRole("button", { name: "Save flow", exact: true }).click();
   await expect(page.getByRole("alert")).toContainText("not available yet");
-  page.once("dialog", (dialog) => dialog.dismiss());
+  const cancelledNavigation = page.waitForEvent("dialog").then((dialog) => dialog.dismiss());
   await page.getByRole("button", { name: "Dashboard", exact: true }).click();
+  await cancelledNavigation;
+  await expect(page).toHaveURL(/#builder$/);
   await expect(page.getByLabel("Flow name")).toHaveValue("Biology class preparation");
-  page.once("dialog", (dialog) => dialog.accept());
-  await page.reload();
+  await reloadAcceptingDialogs(page);
   await expect(page.getByLabel("Flow name")).toHaveValue("Biology class preparation");
   await expect(page.getByLabel("Block name", { exact: true }).nth(1)).toHaveValue(
     "Recall the solution"
@@ -83,8 +97,7 @@ test("student builds, completes two blocks, recovers a failed reflection and reo
   await page.getByRole("combobox", { name: "Study flow", exact: true }).selectOption(flow.id);
   await page.getByRole("button", { name: "Start session", exact: true }).click();
   await expect(page.getByRole("button", { name: "Pause", exact: true })).toBeVisible();
-  page.once("dialog", (dialog) => dialog.accept());
-  await page.reload();
+  await reloadAcceptingDialogs(page);
   await expect(page.getByRole("button", { name: "Pause", exact: true })).toBeVisible();
   // Real elapsed time: the server also validates duration, so no fake clock.
   await expect(page.getByText("Session saved.", { exact: true })).toBeVisible({ timeout: 130000 });
@@ -97,8 +110,7 @@ test("student builds, completes two blocks, recovers a failed reflection and reo
   await page.getByRole("button", { name: "Save reflection", exact: true }).click();
   await expect(page.getByRole("alert")).toBeVisible();
   await expect(notes).toHaveValue("Retrieving the solution helped. Review cell division next.");
-  page.once("dialog", (dialog) => dialog.accept());
-  await page.reload();
+  await reloadAcceptingDialogs(page);
   await expect(notes).toHaveValue("Retrieving the solution helped. Review cell division next.");
   await page.unroute("**/api/sessions/*/log");
   await page.getByRole("button", { name: "Save reflection", exact: true }).click();
