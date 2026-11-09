@@ -43,6 +43,11 @@ Full workspace/session and CSV responses stream after successful reads. Normal s
 
 ## Flow validation
 
+Selected-session sharing uses separate owner grants and recipient read-only
+routes; it never changes workspace ownership or analytics membership. See
+[MENTOR_SHARING.md](MENTOR_SHARING.md) for the explicit confirmation, reflection
+opt-in, revocation and account-code contracts.
+
 Titles are trimmed, nonempty, at most 120 characters; subjects at most 60. A flow has 1–20 blocks, each with a title, one of `focus | break | review | recall`, and an integer duration of 1–120 minutes. Total duration cannot exceed 480 minutes. At least one block must be a study block. IDs and totals sent by a client are not trusted as computed values. Array order is execution order.
 
 ## Session semantics

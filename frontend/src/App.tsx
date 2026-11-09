@@ -11,6 +11,7 @@ import Settings from "./screens/Settings";
 import Timer from "./screens/Timer";
 import CrudDemo from "./screens/CrudDemo";
 import Auth from "./screens/Auth";
+import SharedSessions from "./screens/SharedSessions";
 import { confirmNavigation, currentScreen, navigate } from "./lib/navigation";
 import { useWorkspace } from "./lib/useWorkspace";
 
@@ -188,6 +189,7 @@ export default function App() {
             {screen === "community" && <CommunityHub />}
             {screen === "reflect" && <Reflection key={`${mode}-${user?.id}`} />}
             {screen === "history" && <SessionHistory key={`${mode}-${user?.id}`} />}
+            {screen === "shared" && <SharedSessions key={`${mode}-${user?.id}`} />}
             <div hidden={screen !== "timer"}>
               <Timer
                 active={screen === "timer"}

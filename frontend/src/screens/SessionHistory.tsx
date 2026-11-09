@@ -4,12 +4,14 @@ import { useEffect, useState } from "react";
 import { useWorkspace } from "../lib/useWorkspace";
 import { navigate } from "../lib/navigation";
 import { dayKey } from "../lib/analytics";
+import SessionSharing from "../components/SessionSharing";
 export default function SessionHistory() {
-  const { data, getHistory } = useWorkspace();
+  const { data, getHistory, mode, user } = useWorkspace();
   const [query, setQuery] = useState("");
   const [subject, setSubject] = useState("");
   const [withReflection, setWithReflection] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [sharing, setSharing] = useState<string | null>(null);
   const [page, setPage] = useState<HistoryPage | null>(null);
   const [offset, setOffset] = useState(0);
   const [revision, setRevision] = useState<number | undefined>();
@@ -41,6 +43,7 @@ export default function SessionHistory() {
     setOffset(0);
     setRevision(undefined);
     setExpanded(null);
+    setSharing(null);
   }
   const subjects = page?.subjects || [];
   const sessions = loading || error ? [] : page?.items || [];
@@ -250,7 +253,18 @@ export default function SessionHistory() {
                   <button className="text-button" onClick={() => reflect(session.id)}>
                     {session.reflection ? "Edit reflection" : "Add reflection →"}
                   </button>
+                  {mode === "server" && user && (
+                    <button
+                      className="text-button"
+                      onClick={() => setSharing(sharing === session.id ? null : session.id)}
+                    >
+                      {sharing === session.id ? "Close sharing" : "Share session"}
+                    </button>
+                  )}
                 </div>
+                {sharing === session.id && (
+                  <SessionSharing key={session.id} sessionId={session.id} />
+                )}
                 {expanded === session.id && session.reflection && (
                   <div className="reflection-detail">
                     <div className="inline-actions">

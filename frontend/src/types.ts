@@ -7,6 +7,7 @@ export type Screen =
   | "community"
   | "reflect"
   | "history"
+  | "shared"
   | "settings"
   | "timer"
   | "login"
