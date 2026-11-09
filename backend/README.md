@@ -6,15 +6,15 @@ Express + TypeScript, PostgreSQL, Prisma and Better Auth. Every account has its 
 
 Run `npm ci`, then `npm run dev:local` in backend. This starts persistent local Prisma Postgres, applies migrations, and runs the API on `127.0.0.1:4000`. Start the frontend separately and open `http://localhost:5173`. Local database data stays on your machine. The generated signing secret lives in ignored `backend/data/local-auth-secret`. This command never uses the production database.
 
-For your own PostgreSQL instance, copy `.env.example` to ignored `.env`, set DATABASE_URL, a random BETTER_AUTH_SECRET of at least 32 characters, and BETTER_AUTH_URL to the frontend origin. Run `npm run db:migrate`, then `npm run dev`. Build generates Prisma Client, type-checks and bundles; `npm start` runs compiled code with environment supplied by your process manager.
+For your own PostgreSQL instance, copy `.env.example` to ignored `.env`, set DATABASE_URL, a random BETTER_AUTH_SECRET of at least 32 characters, and BETTER_AUTH_URL to the frontend origin. Run `npm run db:generate`, `npm run db:migrate`, `npm run db:seed`, then `npm run dev`. The repeatable seed updates only the public technique catalog. Build generates Prisma Client, type-checks and bundles; `npm start` runs compiled code with environment supplied by your process manager.
 
 The old unauthenticated file adapter requires ALLOW_LOCAL_WORKSPACE=true outside Vercel. It is never a production fallback and its records are never automatically assigned to an account.
 
 ## Accounts
 
-Registration signs in immediately. Better Auth normalizes emails and hashes passwords with scrypt; passwords require 12–128 characters. Revocable seven-day sessions use HttpOnly, SameSite=Lax cookies, Secure on hosted HTTPS. Database-backed throttling limits login and registration across function instances. Private writes validate Origin; ownership always comes from the session. Workspace documents use PostgreSQL JSON with row locks for concurrent updates.
+Registration signs in immediately. Better Auth normalizes emails and hashes passwords with scrypt; passwords require 12–128 characters. Revocable seven-day sessions use HttpOnly, SameSite=Lax cookies, Secure on hosted HTTPS. Database-backed throttling limits login and registration across function instances. Private writes validate Origin; ownership always comes from the session. StudyFlow, ordered StudyBlock, StudyType, StudySession and one-per-session SessionLog rows use owner-scoped keys. An account row lock serializes transactions across all study tables. The older JSON document remains a transactionally maintained compatibility mirror for rolling upgrades and rollback; see [the data model and migration guide](../docs/DATA_MODEL.md).
 
-Device workspaces can be explicitly reviewed and copied into accounts without overwriting existing records or clearing browser data; see [the import guide](../docs/DEVICE_IMPORT.md). Email verification/reset, mentor roles, normalized study tables, backup-file/legacy imports and automatic live synchronization remain follow-up work. See [AUTH.md](../docs/AUTH.md) and [API.md](../docs/API.md).
+Device workspaces can be explicitly reviewed and copied into accounts without overwriting existing records or clearing browser data; see [the import guide](../docs/DEVICE_IMPORT.md). Email verification/reset, mentor roles, backup-file/legacy imports and automatic live synchronization remain follow-up work. See [AUTH.md](../docs/AUTH.md) and [API.md](../docs/API.md).
 
 ## Deployment
 

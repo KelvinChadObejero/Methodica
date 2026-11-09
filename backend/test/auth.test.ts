@@ -7,11 +7,12 @@ import { promisify } from "node:util";
 import { createServer } from "node:http";
 import { startPrismaDevServer } from "@prisma/dev";
 import { createApp } from "../src/app.js";
-import { createDatabase } from "../src/database.js";
+import { AccountWorkspace, createDatabase, seedStudyTypes } from "../src/database.js";
 import { createAuthentication } from "../src/auth.js";
 import { reviewWorkspaceImport } from "../src/workspace-import.js";
 import { initialWorkspace } from "../src/seed.js";
 import type { Workspace } from "../src/domain.js";
+import type { Prisma } from "../src/generated/prisma/client.js";
 
 test(
   "accounts persist, revoke sessions and isolate every workspace route",
@@ -346,6 +347,168 @@ test(
       assert.match(bundled.stdout, /bundled-auth-and-database-ready/);
     } finally {
       await new Promise<void>((done) => server.close(() => done()));
+      await db.$disconnect();
+      await postgres?.close();
+    }
+  }
+);
+
+test(
+  "normalized study tables preserve migrations, rollback, ordering and account isolation",
+  { timeout: 120000 },
+  async () => {
+    const postgres = process.env.TEST_DATABASE_URL
+      ? null
+      : await startPrismaDevServer({
+          persistenceMode: "stateless",
+          name: "methodica-domain-test",
+          port: 0,
+          databasePort: 0,
+          shadowDatabasePort: 0,
+          streamsPort: 0,
+        });
+    const url = process.env.TEST_DATABASE_URL || postgres!.database.connectionString;
+    let db = createDatabase(url, postgres ? 1 : 3);
+    const userId = "domain-alice";
+    const otherId = "domain-bob";
+    const json = (value: Workspace) => value as unknown as Prisma.InputJsonValue;
+    try {
+      await promisify(execFile)(
+        process.execPath,
+        ["node_modules/prisma/build/index.js", "migrate", "deploy"],
+        {
+          env: { ...process.env, DATABASE_URL: url },
+          timeout: 30000,
+        }
+      );
+      for (const id of [userId, otherId])
+        await db.user.create({
+          data: {
+            id,
+            name: id,
+            email: `${id}@example.test`,
+          },
+        });
+      const legacy = initialWorkspace();
+      legacy.flows[0].blocks[0].studyTypeId = "focus";
+      legacy.sessions.push({
+        id: "historical-session",
+        flowId: legacy.flows[0].id,
+        flowTitle: "Original historical title",
+        flowTag: "General",
+        subject: "Biology",
+        startedAt: "2026-10-20T08:00:00.000Z",
+        durationMinutes: 2,
+        focusMinutes: 1.5,
+        status: "stopped",
+        hasReflection: true,
+        reflection: {
+          sessionTitle: "Original historical title",
+          sessionSubtitle: "Original label",
+          comprehension: 4,
+          fatigue: 2,
+          notes: "Private notes\nwith a second line",
+        },
+      });
+      // Simulate an account created by the JSON deployment before this migration.
+      await db.workspace.create({ data: { userId, data: json(legacy) } });
+      let store = new AccountWorkspace(db, userId);
+      assert.deepEqual(await store.read(), legacy);
+      assert.equal(await db.studyType.count(), 7);
+      await seedStudyTypes(db);
+      assert.equal(await db.studyType.count(), 7);
+      assert.equal(await db.studyBlock.count({ where: { userId } }), 9);
+      assert.equal(
+        (await db.studyBlock.findFirstOrThrow({ where: { userId, studyTypeId: "focus" } }))
+          .studyTypeId,
+        "focus"
+      );
+      assert.equal(await db.sessionLog.count({ where: { userId } }), 1);
+      assert((await db.workspace.findUniqueOrThrow({ where: { userId } })).normalizedDigest);
+      const other = new AccountWorkspace(db, otherId);
+      await other.read();
+      await store.update((data) => {
+        // These IDs already exist in Bob's workspace and must remain independent.
+        data.flows[0].title = "Alice only";
+        data.flows[0].blocks.reverse();
+        data.templates[0].id = data.flows[0].id;
+      });
+      assert.notEqual((await other.read()).flows[0].title, "Alice only");
+      const beforeFailure = await store.read();
+      await assert.rejects(
+        store.update((data) => {
+          data.flows[0].title = "Must roll back";
+          data.flows[0].blocks[0].studyTypeId = "missing-technique";
+        })
+      );
+      assert.deepEqual(await store.read(), beforeFailure);
+      assert.deepEqual(
+        (await db.workspace.findUniqueOrThrow({ where: { userId } })).data,
+        beforeFailure
+      );
+      await assert.rejects(
+        store.update((data) => {
+          data.sessions[0].reflection!.notes = "Must also roll back";
+          throw new Error("Abort study change");
+        }),
+        /Abort study change/
+      );
+      assert.deepEqual(await store.read(), beforeFailure);
+      // A new client/API process reads committed relational rows and exact block order.
+      await db.$disconnect();
+      db = createDatabase(url, postgres ? 1 : 3);
+      store = new AccountWorkspace(db, userId);
+      assert.deepEqual(await store.read(), beforeFailure);
+      await store.update((data) => {
+        data.flows = [];
+      });
+      assert.equal(await db.studyBlock.count({ where: { userId, flowKind: "flow" } }), 0);
+      assert.deepEqual((await store.read()).sessions, legacy.sessions);
+      assert.equal(await db.sessionLog.count({ where: { userId } }), 1);
+      // A rollback deployment can write JSON; its next write is reconciled safely.
+      const rollback = await store.read();
+      rollback.sessions[0].reflection!.notes = "Saved by previous deployment";
+      await db.workspace.update({ where: { userId }, data: { data: json(rollback) } });
+      assert.deepEqual(await store.read(), rollback);
+      assert.equal(
+        (
+          await db.sessionLog.findUniqueOrThrow({
+            where: { userId_sessionId: { userId, sessionId: "historical-session" } },
+          })
+        ).notes,
+        "Saved by previous deployment"
+      );
+      // Exercise a history at the supported limit, including a prepend and update.
+      const large = structuredClone(rollback);
+      large.sessions = Array.from({ length: 4999 }, (_, index) => ({
+        ...legacy.sessions[0],
+        id: `legacy history ${index}`,
+        reflection: { ...legacy.sessions[0].reflection!, notes: "A".repeat(2000) },
+      }));
+      assert(JSON.stringify(large).length > 8 * 1024 * 1024);
+      await db.workspace.update({ where: { userId }, data: { data: json(large) } });
+      assert.equal((await store.read()).sessions.length, 4999);
+      await store.update((data) => {
+        data.sessions.unshift({ ...legacy.sessions[0], id: "newest-session" });
+      });
+      const full = await store.read();
+      assert.equal(full.sessions.length, 5000);
+      assert.equal(full.sessions[0].id, "newest-session");
+      assert.equal(full.sessions[4999].id, "legacy history 4998");
+      await db.workspace.update({ where: { userId }, data: { data: json(rollback) } });
+      assert.deepEqual(await store.read(), rollback);
+      const corrupt = { ...rollback, flows: [null] } as unknown as Workspace;
+      await db.workspace.update({ where: { userId }, data: { data: json(corrupt) } });
+      await assert.rejects(store.read());
+      assert.deepEqual((await db.workspace.findUniqueOrThrow({ where: { userId } })).data, corrupt);
+      assert.equal(await db.sessionLog.count({ where: { userId } }), 1);
+      await db.user.delete({ where: { id: userId } });
+      assert.equal(await db.studyFlow.count({ where: { userId } }), 0);
+      assert.equal(await db.studySession.count({ where: { userId } }), 0);
+      assert.equal(await db.sessionLog.count({ where: { userId } }), 0);
+      assert.equal(await db.studyFlow.count({ where: { userId: otherId } }), 3);
+    } finally {
+      await db.user.deleteMany({ where: { id: { in: [userId, otherId] } } }).catch(() => {});
       await db.$disconnect();
       await postgres?.close();
     }

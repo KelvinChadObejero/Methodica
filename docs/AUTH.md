@@ -4,7 +4,7 @@ The website supports email/password registration, login, logout, restored sessio
 
 ## Data boundary
 
-Better Auth owns User, Account, Session, Verification and RateLimit tables. Workspace is a separate document with a unique user ID and a cascading foreign key. The API derives ownership from the verified session, never from a body or account-scope header. Row locks serialize document writes across function instances. Normalized study entities remain DB-01/DB-02 work; current flows and session snapshots keep their API shape.
+Better Auth owns User, Account, Session, Verification and RateLimit tables. StudyFlow, StudyBlock, StudyType, StudySession and SessionLog hold study data with composite owner-scoped keys and cascading ownership. The API derives ownership from the verified session, never from a body or account-scope header. A Workspace row lock serializes writes across function instances; its JSON document remains a compatibility mirror for rolling upgrades and rollback. See [DATA_MODEL.md](DATA_MODEL.md) for the schema, deletion rules, migration and retained HTTP contract.
 
 Registration starts a fresh account workspace. Existing device data stays separate and is never silently uploaded. Users can explicitly review and copy the current browser workspace from Workspace Connection; see [DEVICE_IMPORT.md](DEVICE_IMPORT.md). Device exports remain available, while backup-file and legacy migrations remain follow-up work. Saved templates are private copies, not public community posts.
 
@@ -20,6 +20,6 @@ Hosted cookies are HttpOnly, Secure, SameSite=Lax and hostname-scoped. Sessions 
 - Agree on mentor/admin permissions; registration cannot grant a privileged role.
 - Add account deletion, retention and backup/restore procedures.
 - Separate preview storage before incompatible migrations; connected preview/production currently share the database.
-- Finish draft recovery, mobile login and normalized domain tables in the checklist.
+- Finish mobile login and release acceptance in the checklist. Unsaved builder/reflection drafts recover in the same tab, scoped separately to each account and device workspace; they are not database saves and disappear when the tab closes.
 
 References: [Express integration](https://better-auth.com/docs/integrations/express), [Prisma adapter](https://better-auth.com/docs/adapters/prisma), [sessions](https://better-auth.com/docs/concepts/session-management), [rate limits](https://better-auth.com/docs/concepts/rate-limit).
