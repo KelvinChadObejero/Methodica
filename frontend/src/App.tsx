@@ -189,7 +189,10 @@ export default function App() {
             {screen === "reflect" && <Reflection key={`${mode}-${user?.id}`} />}
             {screen === "history" && <SessionHistory key={`${mode}-${user?.id}`} />}
             <div hidden={screen !== "timer"}>
-              <Timer key={`${mode}-${mode === "server" ? user?.id : "guest"}`} />
+              <Timer
+                active={screen === "timer"}
+                key={`${mode}-${mode === "server" ? user?.id : "guest"}`}
+              />
             </div>
           </>
         )}

@@ -11,7 +11,8 @@ For the automated browser journey, first install dependencies in both packages,
 then run `npm run db:generate` in `backend`. In `frontend`, run
 `npx playwright install chromium` once, then `npm run test:e2e`. It provisions a
 disposable database/API on port 4100 and a separate Vite instance on port 5174.
-Those ports must be free; the runner refuses to reuse existing servers.
+The browser suite uses full Chromium in headless mode so permitted desktop
+Notification construction is exercised. Those ports must be free; the runner refuses to reuse existing servers.
 The main journey waits for two real one-minute blocks so API elapsed-time
 validation is exercised. Screenshots and failure traces are in
 `frontend/test-results`. CI uploads them as `browser-evidence`.
@@ -24,8 +25,9 @@ validation is exercised. Screenshots and failure traces are in
 3. Name the flow and subject; add another study block. Drag block numbers to
    reorder them, then demonstrate Move up/Move down using the keyboard.
 4. Save. Reload or log in from another browser and reopen the exact block order.
-5. Run a two-block flow. Pause/resume and refresh once. Complete it or use
+5. Run a two-block flow. Pause/resume and refresh once, then explicitly Resume the recovered timer. Complete it or use
    Finish & save elapsed time to demonstrate a partial session honestly.
+   Duplicate the tab to show its control lock. Open the saved session's execution timeline after completing or skipping a block.
 6. Save a reflection. Reopen it in history, update it, log out/in, and verify it.
 7. Open a second account. Show that its flows/history/reflections are separate.
 8. If useful, demonstrate the existing explicit device-data review/import and

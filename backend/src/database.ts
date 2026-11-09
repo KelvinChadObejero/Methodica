@@ -1,7 +1,14 @@
 import { PrismaPg } from "@prisma/adapter-pg";
 import { createHash } from "node:crypto";
 import { PrismaClient, Prisma } from "./generated/prisma/client.js";
-import type { StudyBlock, SessionLog, StudyFlow, StudyFlowTemplate, Workspace } from "./domain.js";
+import type {
+  StudyBlock,
+  SessionExecution,
+  SessionLog,
+  StudyFlow,
+  StudyFlowTemplate,
+  Workspace,
+} from "./domain.js";
 import { initialWorkspace, studyTypes } from "./seed.js";
 import { canonical, WorkspaceImportError } from "./workspace-import.js";
 
@@ -106,6 +113,7 @@ function sessionFromRow(
     status: row.status,
     ...(row.timingSource === "legacy-estimate" ? { timingSource: "legacy-estimate" as const } : {}),
     ...(row.blocks === null ? {} : { blocks: row.blocks as unknown as StudyBlock[] }),
+    ...(row.execution === null ? {} : { execution: row.execution as unknown as SessionExecution }),
     hasReflection: row.log !== null,
     ...(row.log
       ? {
@@ -135,6 +143,9 @@ function sessionRecord(session: SessionLog, position: number) {
     status: session.status,
     timingSource: session.timingSource ?? null,
     blocks: session.blocks ? (session.blocks as unknown as Prisma.InputJsonValue) : Prisma.DbNull,
+    execution: session.execution
+      ? (session.execution as unknown as Prisma.InputJsonValue)
+      : Prisma.DbNull,
   };
 }
 
@@ -503,6 +514,8 @@ export class AccountWorkspace implements WorkspaceStore {
           continue;
         if (session.blocks === undefined && old.blocks !== null)
           session.blocks = old.blocks as unknown as StudyBlock[];
+        if (session.execution === undefined && old.execution !== null)
+          session.execution = old.execution as unknown as SessionExecution;
         if (session.timingSource === undefined && old.timingSource === "legacy-estimate")
           session.timingSource = "legacy-estimate";
       }

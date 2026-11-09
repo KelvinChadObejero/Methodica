@@ -203,15 +203,39 @@ export default function SessionHistory() {
                   <details className="snapshot-detail">
                     <summary>Flow at session start</summary>
                     <ol>
-                      {session.blocks.map((block) => (
+                      {session.blocks.map((block, index) => (
                         <li key={block.id}>
                           {block.title} · {block.type} · {block.durationMinutes} min planned
+                          {session.execution && (
+                            <div>
+                              {session.execution.blocks[index].outcome.replace("-", " ")} ·{" "}
+                              {(session.execution.blocks[index].elapsedMs / 1000).toFixed(1)}{" "}
+                              seconds run
+                            </div>
+                          )}
                         </li>
                       ))}
                     </ol>
                   </details>
                 ) : (
                   <p className="muted">Block details were not recorded for this older session.</p>
+                )}
+                {session.execution ? (
+                  <details className="snapshot-detail">
+                    <summary>Execution timeline</summary>
+                    <ol>
+                      {session.execution.events.map((event, index) => (
+                        <li key={index}>
+                          {(event.atMs / 1000).toFixed(1)} seconds: {event.type}{" "}
+                          {session.blocks?.find((block) => block.id === event.blockId)?.title}
+                        </li>
+                      ))}
+                    </ol>
+                  </details>
+                ) : (
+                  <p className="muted">
+                    Execution events were not recorded for this older session.
+                  </p>
                 )}
                 <div className="inline-actions">
                   {session.reflection && (

@@ -1,6 +1,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { finishRun, newRun, skipBlock, tick, toggleRun } from "../src/lib/timer";
+import {
+  finishRun,
+  newRun,
+  skipBlock,
+  tick,
+  toggleRun,
+  recoverRun,
+  timerNow,
+} from "../src/lib/timer";
+import { validateExecution } from "../../backend/src/workspace-import";
 import type { StudyFlow } from "../src/types";
 
 const flow: StudyFlow = {
@@ -76,7 +85,7 @@ test("pausing after a delayed manual-break boundary does not start the break", (
   assert.equal(paused.elapsedMs, 60000);
 });
 
-test("a serialized timer resumes from its original deadline after refresh", () => {
+test("serialization retains deadline data before explicit recovery pauses it", () => {
   const run = toggleRun(newRun(flow), start);
   const restored = JSON.parse(JSON.stringify(run));
   const later = tick(restored, start + 65000);
@@ -94,4 +103,59 @@ test("resetting a later block uses the first block and does not mutate the saved
   assert.equal(reset.remainingMs, 60000);
   assert.notEqual(reset.id, advanced.id);
   assert.deepEqual(flow, original);
+});
+
+test("block events catch up once, preserve pauses and validate against measured totals", () => {
+  let run = toggleRun(newRun(flow), start);
+  const initial = structuredClone(run);
+  run = skipBlock(run, start + 10000);
+  run = toggleRun(run, start + 20000); // Pause during the break.
+  run = toggleRun(run, start + 50000);
+  run = finishRun(run, start + 55000);
+  assert.deepEqual(initial.execution!.events, [{ blockId: "a", type: "started", atMs: 0 }]);
+  assert.deepEqual(run.execution!.blocks, [
+    { blockId: "a", outcome: "skipped", elapsedMs: 10000 },
+    { blockId: "b", outcome: "stopped", elapsedMs: 15000 },
+    { blockId: "c", outcome: "not-started", elapsedMs: 0 },
+  ]);
+  assert.deepEqual(
+    validateExecution(run.execution, flow.blocks, 25 / 60, 10 / 60, "stopped"),
+    run.execution
+  );
+  assert.deepEqual(tick(run, start + 999999).execution, run.execution);
+  const full = tick(toggleRun(newRun(flow), start), start + 600000);
+  assert.equal(full.execution!.events.length, 6);
+  assert.deepEqual(
+    validateExecution(full.execution, flow.blocks, 4, 3, "completed"),
+    full.execution
+  );
+  assert.throws(
+    () => validateExecution({ ...full.execution, events: [] }, flow.blocks, 4, 3, "completed"),
+    /agree/
+  );
+});
+
+test("reopening pauses saved progress without crediting absent time or fabricating old events", () => {
+  const paused = tick(toggleRun(newRun(flow), start), start + 10000);
+  const recovered = recoverRun(JSON.parse(JSON.stringify(paused)))!;
+  assert.equal(recovered.deadline, null);
+  assert.equal(recovered.recovered, true);
+  assert.equal(tick(recovered, start + 3600000).elapsedMs, 10000);
+  const resumed = toggleRun(recovered, start + 3600000);
+  assert.equal(tick(resumed, start + 3601000).elapsedMs, 11000);
+  assert.equal(resumed.execution!.events.filter((event) => event.type === "started").length, 1);
+  const legacy = { ...paused };
+  delete legacy.execution;
+  assert.equal(recoverRun(legacy)!.execution, undefined);
+});
+
+test("system-clock jumps do not advance the monotonic timer clock", () => {
+  const original = Date.now;
+  const before = timerNow();
+  try {
+    Date.now = () => original() + 3600000;
+    assert(Math.abs(timerNow() - before) < 1000);
+  } finally {
+    Date.now = original;
+  }
 });

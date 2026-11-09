@@ -1,4 +1,8 @@
-import { canonical, validateStudyBlocks } from "../../../backend/src/workspace-import";
+import {
+  canonical,
+  validateStudyBlocks,
+  validateExecution,
+} from "../../../backend/src/workspace-import";
 import type { ReflectionEntry, SessionLog, StudyFlow, StudyType, Workspace } from "../types";
 
 export const DEVICE_WORKSPACE_KEY = "methodica-device-workspace-v1";
@@ -127,13 +131,21 @@ export class DeviceWorkspace {
     )
       throw new Error("This session has invalid timing information.");
     if (input.blocks) validateStudyBlocks(input.blocks);
+    if (input.execution)
+      validateExecution(
+        input.execution,
+        input.blocks,
+        input.durationMinutes,
+        input.focusMinutes,
+        input.status
+      );
     return this.update((data) => {
       const existing = data.sessions.find((session) => session.id === input.id);
       if (existing) {
         if (
           (Object.keys(input) as (keyof NewSession)[]).some(
             (key) =>
-              !(key === "blocks" && existing.blocks === undefined) &&
+              !((key === "blocks" || key === "execution") && existing[key] === undefined) &&
               canonical(existing[key]) !== canonical(input[key])
           )
         )

@@ -8,6 +8,8 @@ export default defineConfig({
   expect: { timeout: 10000 },
   retries: 0,
   use: {
+    // Full Chromium's headless mode supports the real Notification API.
+    channel: "chromium",
     actionTimeout: 15000,
     baseURL: "http://127.0.0.1:5174",
     trace: "retain-on-failure",

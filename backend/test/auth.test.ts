@@ -142,6 +142,14 @@ test(
         durationMinutes: 1,
         focusMinutes: 1,
         blocks: flow.body.blocks,
+        execution: {
+          version: 1,
+          blocks: [{ blockId: flow.body.blocks[0].id, elapsedMs: 60000, outcome: "completed" }],
+          events: [
+            { blockId: flow.body.blocks[0].id, type: "started", atMs: 0 },
+            { blockId: flow.body.blocks[0].id, type: "completed", atMs: 60000 },
+          ],
+        },
         status: "completed",
       };
       assert.equal((await request("/sessions", "POST", sessionInput, firstCookie)).status, 201);
@@ -157,6 +165,22 @@ test(
       );
       const recorded = await request("/sessions/alice-session", "GET", undefined, firstCookie);
       assert.deepEqual(recorded.body.blocks, flow.body.blocks);
+      assert.deepEqual(recorded.body.execution, sessionInput.execution);
+      assert.equal(
+        (
+          await request(
+            "/sessions",
+            "POST",
+            {
+              ...sessionInput,
+              id: "bad-execution",
+              execution: { ...sessionInput.execution, events: [] },
+            },
+            firstCookie
+          )
+        ).status,
+        400
+      );
       assert.equal(
         (await request("/sessions/page?q=%25", "GET", undefined, firstCookie)).body.total,
         0
@@ -276,6 +300,7 @@ test(
       assert.notEqual(login.cookie, firstCookie);
       const restored = await request("/workspace", "GET", undefined, login.cookie);
       assert.equal(restored.body.sessions[0].reflection.notes, reflection.notes);
+      assert.deepEqual(restored.body.sessions[0].execution, sessionInput.execution);
       const me = await request("/auth/get-session", "GET", undefined, login.cookie);
       assert.equal(me.body.user.email, alice.email);
       const device = initialWorkspace();
@@ -293,6 +318,7 @@ test(
       device.sessions.push({
         ...sessionInput,
         id: "device-session",
+        execution: undefined,
         focusMinutes: 0,
         status: "stopped",
         timingSource: "legacy-estimate",
@@ -388,6 +414,19 @@ test(
         !(await request("/workspace", "GET", undefined, bobsCookie)).body.sessions.some(
           (session: { id: string }) => session.id === "device-session"
         )
+      );
+      const oldSerializer = (await request("/workspace", "GET", undefined, login.cookie))
+        .body as Workspace;
+      const oldSession = oldSerializer.sessions.find((session) => session.id === "alice-session")!;
+      delete oldSession.blocks;
+      delete oldSession.execution;
+      await db.workspace.update({
+        where: { userId: signedUp.body.user.id },
+        data: { data: oldSerializer as unknown as Prisma.InputJsonValue },
+      });
+      assert.deepEqual(
+        (await request("/sessions/alice-session", "GET", undefined, login.cookie)).body.execution,
+        sessionInput.execution
       );
       await db.session.updateMany({
         where: { userId: signedUp.body.user.id },

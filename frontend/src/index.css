@@ -1928,7 +1928,7 @@ button:disabled {
   min-width: 0;
 }
 .day-label { overflow-wrap: anywhere; text-align: center; }
-.snapshot-detail { margin: 12px 0; color: var(--ink-soft); }
+.snapshot-detail { margin: 12px 0; color: var(--ink-soft); overflow-wrap: anywhere; }
 .snapshot-detail summary { cursor: pointer; }
 .snapshot-detail li { margin-top: 6px; }
 .day-value,

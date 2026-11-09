@@ -37,6 +37,21 @@ async function login(page: Page, email: string) {
   await expect(page).toHaveURL(/#dashboard$/);
 }
 
+function recordNotifications() {
+  const native = window.Notification;
+  const state = window as unknown as { timerNotices: string[] };
+  state.timerNotices = [];
+  const wrapped = function (title: string, options?: NotificationOptions) {
+    const notice = new native(title, options);
+    state.timerNotices.push(title);
+    return notice;
+  };
+  Object.defineProperty(wrapped, "permission", { get: () => native.permission });
+  window.Notification = wrapped as unknown as typeof Notification;
+  localStorage.setItem("methodica-settings", JSON.stringify({ notifications: true }));
+  window.dispatchEvent(new Event("methodica-preferences"));
+}
+
 test("student builds, completes two blocks, recovers a failed reflection and reopens on another device", async ({
   page,
   browser,
@@ -96,12 +111,72 @@ test("student builds, completes two blocks, recovers a failed reflection and reo
   ]);
   await page.getByRole("button", { name: "Study Timer", exact: true }).click();
   await page.getByRole("combobox", { name: "Study flow", exact: true }).selectOption(flow.id);
+  await page.context().grantPermissions(["notifications"], { origin: new URL(page.url()).origin });
+
+  await page.addInitScript(recordNotifications);
+  await page.evaluate(recordNotifications);
+  let sessionPosts = 0;
+  await page.route("**/api/sessions", async (route) => {
+    if (route.request().method() !== "POST") return route.continue();
+    sessionPosts++;
+    if (sessionPosts === 1) {
+      const actual = await route.fetch();
+      expect(actual.status()).toBe(201);
+      return route.fulfill({
+        status: 503,
+        json: { message: "Success response lost after commit" },
+      });
+    }
+    return route.continue();
+  });
   await page.getByRole("button", { name: "Start session", exact: true }).click();
   await expect(page.getByRole("button", { name: "Pause", exact: true })).toBeVisible();
   await reloadAcceptingDialogs(page);
+  await expect(page.getByText(/Your session was recovered and paused/)).toBeVisible();
+  expect(await page.evaluate(() => Notification.permission)).toBe("granted");
+  expect(
+    await page.evaluate(() => JSON.parse(localStorage.getItem("methodica-settings")!).notifications)
+  ).toBe(true);
+  await page.getByRole("button", { name: "Resume", exact: true }).click();
+  const opening = page.waitForEvent("popup");
+  await page.evaluate(() => window.open(location.href));
+  const duplicate = await opening;
+  await expect(duplicate.getByText(/This timer is controlled by another tab/)).toBeVisible();
+  await expect(duplicate.getByRole("button", { name: "Resume", exact: true })).toBeDisabled();
+  await duplicate.close();
+  await page.evaluate(() => {
+    const original = Date.now;
+    Date.now = () => original() + 3600000;
+    Object.assign(window, {
+      restoreTimerClock: () => {
+        Date.now = original;
+      },
+    });
+  });
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const key = Object.keys(sessionStorage).find((key) =>
+          key.startsWith("methodica-account-timer-")
+        );
+        return key ? JSON.parse(sessionStorage.getItem(key)!).elapsedMs : 0;
+      })
+    )
+    .toBeGreaterThan(1000);
+  await page.evaluate(() =>
+    (window as unknown as { restoreTimerClock: () => void }).restoreTimerClock()
+  );
   await expect(page.getByRole("button", { name: "Pause", exact: true })).toBeVisible();
-  // Real elapsed time: the server also validates duration, so no fake clock.
-  await expect(page.getByText("Session saved.", { exact: true })).toBeVisible({ timeout: 130000 });
+  // Real elapsed time, including background/focus changes. No fake timer clock.
+  await expect(page.getByRole("button", { name: "Retry save", exact: true })).toBeVisible({
+    timeout: 130000,
+  });
+  await page.getByRole("button", { name: "Retry save", exact: true }).click();
+  await expect(page.getByText("Session saved.", { exact: true })).toBeVisible();
+  expect(sessionPosts).toBe(2);
+  expect(
+    await page.evaluate(() => (window as unknown as { timerNotices: string[] }).timerNotices.length)
+  ).toBeGreaterThanOrEqual(2);
   await page.getByRole("button", { name: "Add reflection", exact: true }).click();
   const notes = page.getByLabel("What worked? What would you change?");
   await notes.fill("Retrieving the solution helped. Review cell division next.");
@@ -121,6 +196,10 @@ test("student builds, completes two blocks, recovers a failed reflection and reo
   expect(saved.sessions[0].status).toBe("completed");
   expect(saved.sessions[0].durationMinutes).toBe(2);
   expect(saved.sessions[0].blocks).toEqual(flow.blocks);
+  expect(
+    saved.sessions[0].execution.blocks.map((block: { outcome: string }) => block.outcome)
+  ).toEqual(["completed", "completed"]);
+  expect(saved.sessions[0].execution.events).toHaveLength(4);
   expect(saved.sessions[0].reflection.notes).toContain("cell division");
   await page.getByRole("button", { name: "Log out", exact: true }).click();
   await expect(page.locator(".account-name")).toHaveCount(0);
@@ -410,4 +489,72 @@ test("backup and legacy imports require review, preserve sources and safely dedu
   await expect(page).toHaveURL(/#login$/);
   await register(page, "Other backup student", `backup-other-${Date.now()}@example.test`);
   expect((await (await page.request.get("/api/workspace")).json()).sessions).toHaveLength(0);
+});
+
+test("a duplicated device tab waits for its owner, then recovers safely after tab closure", async ({
+  page,
+}, info) => {
+  await page.goto("/");
+  await page.context().grantPermissions(["notifications"], { origin: new URL(page.url()).origin });
+  await page.evaluate(recordNotifications);
+  await page.getByRole("button", { name: "Use this device", exact: true }).click();
+  await page.getByRole("button", { name: "Study Timer", exact: true }).click();
+  await page.getByRole("button", { name: "Start session", exact: true }).click();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => JSON.parse(sessionStorage.getItem("methodica-device-active-timer")!).elapsedMs
+      )
+    )
+    .toBeGreaterThan(1000);
+  const opening = page.waitForEvent("popup");
+  await page.evaluate(() => window.open(location.href));
+  const duplicate = await opening;
+  await duplicate.setViewportSize({ width: 375, height: 812 });
+  await expect(duplicate.getByText(/This timer is controlled by another tab/)).toBeVisible();
+  const before = await duplicate.evaluate(() =>
+    JSON.parse(sessionStorage.getItem("methodica-device-active-timer")!)
+  );
+  await page.close();
+  await duplicate.evaluate(recordNotifications);
+  expect(await duplicate.evaluate(() => Notification.permission)).toBe("granted");
+  expect(
+    await duplicate.evaluate(
+      () => JSON.parse(localStorage.getItem("methodica-settings")!).notifications
+    )
+  ).toBe(true);
+  await duplicate.getByRole("button", { name: "Resume", exact: true }).click();
+  await expect
+    .poll(() =>
+      duplicate.evaluate(
+        () => JSON.parse(sessionStorage.getItem("methodica-device-active-timer")!).elapsedMs
+      )
+    )
+    .toBeGreaterThan(before.elapsedMs + 1000);
+  await duplicate.getByRole("button", { name: "Skip block", exact: true }).click();
+  await duplicate.getByRole("button", { name: "Finish & save elapsed time", exact: true }).click();
+  await expect(duplicate.getByText("Session saved.", { exact: true })).toBeVisible();
+  const saved = await duplicate.evaluate(
+    () => JSON.parse(localStorage.getItem("methodica-device-workspace-v1")!).workspace.sessions
+  );
+  expect(saved).toHaveLength(1);
+  expect(saved[0].id).toBe(before.id);
+  expect(saved[0].execution.blocks[0].outcome).toBe("skipped");
+  expect(saved[0].execution.blocks[1].outcome).toBe("stopped");
+  expect(
+    await duplicate.evaluate(
+      () => (window as unknown as { timerNotices: string[] }).timerNotices.length
+    )
+  ).toBeGreaterThanOrEqual(1);
+  expect(saved[0].execution.events.map((event: { type: string }) => event.type)).toEqual([
+    "started",
+    "skipped",
+    "started",
+    "stopped",
+  ]);
+  await duplicate.getByRole("button", { name: "View history", exact: true }).click();
+  await duplicate.getByText("Execution timeline", { exact: true }).click();
+  await expect(duplicate.locator(".session-card")).toHaveCount(1);
+  await duplicate.screenshot({ path: info.outputPath("device-execution.png"), fullPage: true });
+  await duplicate.close();
 });

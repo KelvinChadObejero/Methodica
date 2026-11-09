@@ -173,6 +173,7 @@ model StudySession {
   status          StudySessionStatus
   timingSource    String?
   blocks          Json?
+  execution       Json?
   log             SessionLog?
 
   @@id([userId, id])

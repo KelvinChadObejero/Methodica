@@ -16,7 +16,7 @@ import type {
   StudyType,
   Workspace,
 } from "../types";
-import { api, errorMessage, setAccountScope } from "./api";
+import { ApiError, api, errorMessage, setAccountScope } from "./api";
 import { WorkspaceContext } from "./useWorkspace";
 import type { ImportSummary } from "../../../backend/src/workspace-import";
 import {
@@ -288,7 +288,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           ? new DeviceWorkspace(localStorage).read().workspace.sessions.find((s) => s.id === id)
           : await api<SessionLog>(`/sessions/${encodeURIComponent(id)}`);
       checkScope(request);
-      if (!result) throw new Error("Session not found.");
+      if (!result) throw new ApiError("Session not found.", 404);
       return result;
     },
     [mode]

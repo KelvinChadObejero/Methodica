@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useWorkspace } from "../lib/useWorkspace";
-import { errorMessage } from "../lib/api";
+import { ApiError, errorMessage } from "../lib/api";
 import { navigate } from "../lib/navigation";
 import { loadPrefs } from "../lib/preferences";
 import {
@@ -10,8 +10,10 @@ import {
   skipBlock,
   tick,
   toggleRun,
+  timerNow,
   type TimerRun,
 } from "../lib/timer";
+import { useTimerLease } from "../lib/useTimerLease";
 import type { SessionLog } from "../types";
 
 function timeLabel(ms: number) {
@@ -21,8 +23,8 @@ function timeLabel(ms: number) {
     .padStart(2, "0")}:${(seconds % 60).toString().padStart(2, "0")}`;
 }
 
-export default function Timer() {
-  const { data, studyTypes, mode, user, saveSession } = useWorkspace();
+export default function Timer({ active }: { active: boolean }) {
+  const { data, studyTypes, mode, user, saveSession, getSession } = useWorkspace();
   const storageKey =
     mode === "device" ? "methodica-device-active-timer" : `methodica-account-timer-${user?.id}`;
   const [run, setRun] = useState<TimerRun | null>(
@@ -34,7 +36,47 @@ export default function Timer() {
   const [error, setError] = useState("");
   const [storageError, setStorageError] = useState("");
   const saving = useRef(false);
-  const previousBlock = useRef(run?.blockIndex);
+  const [verifiedId, setVerifiedId] = useState<string | null>(null);
+  const [verificationError, setVerificationError] = useState("");
+  const [verificationAttempt, setVerificationAttempt] = useState(0);
+  const [transition, setTransition] = useState("");
+  const previousBlock = useRef({ id: run?.id, index: run?.blockIndex, completed: run?.completed });
+  const lease = useTimerLease(
+    `methodica-timer-${mode}-${mode === "device" ? "device" : user?.id}`,
+    active || (!!run?.startedAt && !saved)
+  );
+  const runId = run?.id;
+  const hasStarted = !!run?.startedAt;
+  const retryLease = lease.retry;
+  useEffect(() => {
+    let cancelled = false;
+    setVerifiedId(null);
+    setVerificationError("");
+    if (lease.status !== "owned" || !runId) return;
+    if (!hasStarted) {
+      setVerifiedId(runId);
+      return;
+    }
+    void getSession(runId)
+      .then((existing) => {
+        if (cancelled) return;
+        setSaved(existing);
+        setTransition("This run was already saved. Your saved session is available below.");
+        setRun((current) =>
+          current?.id === runId ? { ...current, completed: true, deadline: null } : current
+        );
+        setVerifiedId(runId);
+      })
+      .catch((cause) => {
+        if (cancelled) return;
+        if (cause instanceof ApiError && cause.status === 404) setVerifiedId(runId);
+        else setVerificationError(errorMessage(cause));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [lease.status, runId, hasStarted, getSession, verificationAttempt]);
+  const canControl = lease.status === "owned" && verifiedId === run?.id && !verificationError;
 
   useEffect(() => {
     if (!run && data?.flows[0]) setRun(newRun(data.flows[0]));
@@ -47,9 +89,9 @@ export default function Timer() {
   }, []);
 
   useEffect(() => {
-    if (!run?.deadline) return;
+    if (!run?.deadline || !canControl) return;
     const update = () =>
-      setRun((current) => (current ? tick(current, Date.now(), prefs.autoStartBreaks) : null));
+      setRun((current) => (current ? tick(current, timerNow(), prefs.autoStartBreaks) : null));
     update();
     const interval = window.setInterval(update, 250);
     window.addEventListener("focus", update);
@@ -57,18 +99,33 @@ export default function Timer() {
       window.clearInterval(interval);
       window.removeEventListener("focus", update);
     };
-  }, [run?.deadline, prefs.autoStartBreaks]);
+  }, [run?.deadline, prefs.autoStartBreaks, canControl]);
 
   useEffect(() => {
     try {
-      if (run?.startedAt) sessionStorage.setItem(storageKey, JSON.stringify(run));
+      if (saved) sessionStorage.removeItem(storageKey);
+      else if (run?.startedAt) sessionStorage.setItem(storageKey, JSON.stringify(run));
       else sessionStorage.removeItem(storageKey);
     } catch {
       setStorageError(
         "This browser cannot retain the timer on refresh. Keep this tab open until your session is saved."
       );
     }
-  }, [run, storageKey]);
+  }, [run, storageKey, saved]);
+
+  useEffect(() => {
+    const reopen = (event: PageTransitionEvent) => {
+      if (!event.persisted) return;
+      setRun((current) =>
+        current?.startedAt && !current.completed
+          ? { ...current, deadline: null, recovered: true }
+          : current
+      );
+      retryLease();
+    };
+    window.addEventListener("pageshow", reopen);
+    return () => window.removeEventListener("pageshow", reopen);
+  }, [retryLease]);
 
   useEffect(() => {
     const beforeUnload = (event: BeforeUnloadEvent) => {
@@ -82,23 +139,35 @@ export default function Timer() {
   }, [run?.startedAt, saved]);
 
   useEffect(() => {
+    const previous = previousBlock.current;
     if (
-      run &&
-      previousBlock.current !== run.blockIndex &&
-      prefs.notifications &&
-      "Notification" in window &&
-      Notification.permission === "granted"
+      !saved &&
+      run?.startedAt &&
+      previous.id === run.id &&
+      (previous.index !== run.blockIndex || (!previous.completed && run.completed))
     ) {
-      new Notification("Methodica: next study block", {
-        body: run.flow.blocks[run.blockIndex].title,
-      });
+      const message = run.completed
+        ? "Session ended. Your study time is ready to save."
+        : `Next block: ${run.flow.blocks[run.blockIndex].title}`;
+      setTransition(message);
+      if (
+        prefs.notifications &&
+        "Notification" in window &&
+        Notification.permission === "granted"
+      ) {
+        try {
+          new Notification("Methodica: study timer", { body: message });
+        } catch {
+          setTransition(`${message} Desktop notifications are unavailable in this browser.`);
+        }
+      }
     }
-    previousBlock.current = run?.blockIndex;
-  }, [run, prefs.notifications]);
+    previousBlock.current = { id: run?.id, index: run?.blockIndex, completed: run?.completed };
+  }, [run, prefs.notifications, saved]);
 
   const save = useCallback(
     async (completed: TimerRun) => {
-      if (saving.current) return;
+      if (saving.current || !canControl) return;
       saving.current = true;
       setBusy(true);
       setError("");
@@ -114,6 +183,7 @@ export default function Timer() {
           startedAt: completed.startedAt,
           subject: completed.flow.tag,
           blocks: completed.flow.blocks,
+          ...(completed.execution ? { execution: completed.execution } : {}),
           durationMinutes,
           focusMinutes: Math.min(durationMinutes, Math.floor(completed.focusMs / 1000) / 60),
           status: completed.skipped ? "stopped" : "completed",
@@ -131,25 +201,27 @@ export default function Timer() {
         setBusy(false);
       }
     },
-    [saveSession, storageKey]
+    [saveSession, storageKey, canControl]
   );
 
   // One request per completed run. A failed save is retried explicitly with the same ID.
   const requestedId = useRef<string | null>(null);
   useEffect(() => {
-    if (run?.completed && !saved && requestedId.current !== run.id) {
+    if (canControl && run?.completed && !saved && requestedId.current !== run.id) {
       requestedId.current = run.id;
       void save(run);
     }
-  }, [run, saved, save]);
+  }, [run, saved, save, canControl]);
 
   const toggle = useCallback(
     () =>
-      setRun((current) => (current ? toggleRun(current, Date.now(), prefs.autoStartBreaks) : null)),
-    [prefs.autoStartBreaks]
+      setRun((current) =>
+        current && canControl ? toggleRun(current, timerNow(), prefs.autoStartBreaks) : current
+      ),
+    [prefs.autoStartBreaks, canControl]
   );
   const reset = useCallback(() => {
-    if (!run || busy) return;
+    if (!run || busy || !canControl) return;
     if (
       run.startedAt &&
       !saved &&
@@ -159,11 +231,14 @@ export default function Timer() {
     setRun(newRun(run.flow));
     setSaved(null);
     setError("");
-  }, [run, saved, busy]);
+    setTransition("");
+  }, [run, saved, busy, canControl]);
   const skip = useCallback(
     () =>
-      setRun((current) => (current ? skipBlock(current, Date.now(), prefs.autoStartBreaks) : null)),
-    [prefs.autoStartBreaks]
+      setRun((current) =>
+        current && canControl ? skipBlock(current, timerNow(), prefs.autoStartBreaks) : current
+      ),
+    [prefs.autoStartBreaks, canControl]
   );
 
   useEffect(() => {
@@ -171,6 +246,7 @@ export default function Timer() {
       if (
         window.location.hash.split("?")[0] !== "#timer" ||
         busy ||
+        !canControl ||
         run?.completed ||
         event.repeat ||
         event.ctrlKey ||
@@ -199,7 +275,7 @@ export default function Timer() {
     }
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [toggle, reset, skip, busy, run?.completed, run?.startedAt]);
+  }, [toggle, reset, skip, busy, canControl, run?.completed, run?.startedAt]);
 
   function reflect() {
     if (!saved) return;
@@ -220,18 +296,57 @@ export default function Timer() {
       <p className="page-sub">
         Choose a saved flow. Pause when you need to; only the time you actually run is logged.
       </p>
+      {lease.status === "blocked" && (
+        <p className="feedback" role="status">
+          This timer is controlled by another tab. It will become available when that tab closes or
+          leaves its idle timer screen.
+        </p>
+      )}
+      {lease.status === "unavailable" && (
+        <p className="feedback" role="alert">
+          This browser cannot coordinate timer tabs. Update your browser or try another browser
+          before starting a session.{" "}
+          <button className="text-button" onClick={lease.retry}>
+            Try again
+          </button>
+        </p>
+      )}
+      {lease.status === "checking" && <p role="status">Reserving timer control...</p>}
+      {lease.status === "owned" && !verifiedId && !verificationError && (
+        <p role="status">Checking whether this run was already saved...</p>
+      )}
+      {verificationError && (
+        <p role="alert">
+          {verificationError}{" "}
+          <button className="text-button" onClick={() => setVerificationAttempt((v) => v + 1)}>
+            Retry timer recovery
+          </button>
+        </p>
+      )}
+      {run?.recovered && !saved && (
+        <p className="feedback" role="status">
+          Your session was recovered and paused. Resume when you are ready. Time while this page was
+          closed was not added.
+        </p>
+      )}
+      {transition && (
+        <p className="feedback" role="status">
+          {transition}
+        </p>
+      )}
       <div className="card flow-selector-card">
         <label className="field-label">
           Study flow
           <select
             value={run?.flow.id || ""}
-            disabled={!!run?.startedAt && !saved}
+            disabled={!canControl || (!!run?.startedAt && !saved)}
             onChange={(event) => {
               const flow = data?.flows.find((item) => item.id === event.target.value);
               if (flow) {
                 setRun(newRun(flow));
                 setSaved(null);
                 setError("");
+                setTransition("");
               }
             }}
           >
@@ -298,15 +413,20 @@ export default function Timer() {
             ))}
           </ol>
           <div className="timer-controls">
-            <button className="btn btn-lg" disabled={run.completed || busy} onClick={toggle}>
+            <button
+              className="btn btn-lg"
+              disabled={!canControl || run.completed || busy}
+              onClick={toggle}
+            >
               {run.deadline ? "Pause" : run.startedAt ? "Resume" : "Start session"}
             </button>
-            <button className="btn ghost" disabled={busy} onClick={reset}>
+            <button className="btn ghost" disabled={!canControl || busy} onClick={reset}>
               {saved ? "Study again" : "Reset"}
             </button>
             <button
               className="btn ghost"
               disabled={
+                !canControl ||
                 run.completed ||
                 !run.startedAt ||
                 run.blockIndex >= run.flow.blocks.length - 1 ||
@@ -320,11 +440,15 @@ export default function Timer() {
           <button
             className="text-button"
             disabled={
-              !run.startedAt || run.completed || busy || tick(run, Date.now()).elapsedMs < 1000
+              !canControl ||
+              !run.startedAt ||
+              run.completed ||
+              busy ||
+              tick(run, timerNow()).elapsedMs < 1000
             }
             onClick={() =>
               setRun((current) =>
-                current ? finishRun(current, Date.now(), prefs.autoStartBreaks) : null
+                current ? finishRun(current, timerNow(), prefs.autoStartBreaks) : null
               )
             }
           >
@@ -347,7 +471,11 @@ export default function Timer() {
             <div className="feedback" role="alert">
               {error}{" "}
               {run.completed && (
-                <button className="btn ghost" onClick={() => void save(run)} disabled={busy}>
+                <button
+                  className="btn ghost"
+                  onClick={() => void save(run)}
+                  disabled={!canControl || busy}
+                >
                   Retry save
                 </button>
               )}

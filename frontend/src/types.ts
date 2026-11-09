@@ -27,6 +27,8 @@ export type {
   ReflectionEntry,
   SessionLog,
   Workspace,
+  BlockExecution,
+  SessionExecution,
 } from "../../backend/src/domain";
 
 export interface SettingsPreferences {

@@ -18,6 +18,8 @@ export function sessionsCsv(sessions: SessionLog[]) {
     session.reflection?.fatigue,
     session.reflection?.notes,
     session.timingSource || "recorded",
+    session.blocks ? JSON.stringify(session.blocks) : "",
+    session.execution ? JSON.stringify(session.execution) : "",
   ]);
   return [
     [
@@ -32,6 +34,8 @@ export function sessionsCsv(sessions: SessionLog[]) {
       "fatigue",
       "notes",
       "timingSource",
+      "blocks",
+      "execution",
     ],
     ...rows,
   ]

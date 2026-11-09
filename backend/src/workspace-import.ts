@@ -1,4 +1,11 @@
-import type { Workspace, StudyFlow, StudyFlowTemplate, SessionLog } from "./domain.js";
+import type {
+  Workspace,
+  StudyFlow,
+  StudyFlowTemplate,
+  SessionLog,
+  SessionExecution,
+  StudyBlock,
+} from "./domain.js";
 import { studyTypes } from "./seed.js";
 
 // Stay below Vercel's 4.5 MB request cap, including the review envelope.
@@ -79,6 +86,70 @@ export function validateStudyBlocks(value: unknown) {
   if (totalMinutes > 480) throw new WorkspaceImportError("A flow cannot exceed 480 minutes.");
   return blocks;
 }
+
+export function validateExecution(
+  value: unknown,
+  blocks: StudyBlock[] | undefined,
+  durationMinutes: number,
+  focusMinutes: number,
+  status: SessionLog["status"]
+): SessionExecution {
+  const input = record(value);
+  if (
+    input.version !== 1 ||
+    !blocks ||
+    !Array.isArray(input.blocks) ||
+    input.blocks.length !== blocks.length
+  )
+    throw new WorkspaceImportError("Execution records need the exact planned blocks.");
+  const expected: SessionExecution["events"] = [];
+  let elapsed = 0,
+    focus = 0,
+    ended = false;
+  const records = input.blocks.map((value, index) => {
+    const row = record(value),
+      planned = blocks[index];
+    const outcome = row.outcome as SessionExecution["blocks"][number]["outcome"];
+    const ms = number(
+      row.elapsedMs,
+      "Block elapsed time",
+      0,
+      planned.durationMinutes * 60000,
+      true
+    );
+    if (
+      outcome === "running" ||
+      row.blockId !== planned.id ||
+      !["not-started", "completed", "skipped", "stopped"].includes(outcome) ||
+      (outcome === "not-started" && ms !== 0) ||
+      (outcome === "completed" && ms !== planned.durationMinutes * 60000) ||
+      (ended && outcome !== "not-started")
+    )
+      throw new WorkspaceImportError("Execution order, duration or outcome is invalid.");
+    if (outcome !== "not-started") {
+      expected.push({ blockId: planned.id, type: "started", atMs: elapsed });
+      elapsed += ms;
+      if (planned.type !== "break") focus += ms;
+      expected.push({ blockId: planned.id, type: outcome, atMs: elapsed });
+    }
+    if (outcome === "not-started" || outcome === "stopped") ended = true;
+    return { blockId: planned.id, elapsedMs: ms, outcome };
+  });
+  const events = list(input.events, "Execution events", 40).map((value) => {
+    const event = record(value);
+    return { blockId: event.blockId, type: event.type, atMs: event.atMs };
+  });
+  if (
+    canonical(events) !== canonical(expected) ||
+    Math.abs(Math.floor(elapsed / 1000) / 60 - durationMinutes) > 1e-8 ||
+    Math.abs(Math.min(durationMinutes, Math.floor(focus / 1000) / 60) - focusMinutes) > 1e-8 ||
+    (status === "completed" && records.some((row) => row.outcome !== "completed"))
+  )
+    throw new WorkspaceImportError(
+      "Execution events must agree with saved session time and completion."
+    );
+  return { version: 1, blocks: records, events: expected };
+}
 function flow(value: unknown, template = false): StudyFlow {
   const input = record(value);
   const blocks = validateStudyBlocks(input.blocks);
@@ -132,6 +203,14 @@ function session(value: unknown): SessionLog {
     ...(input.blocks === undefined ? {} : { blocks: validateStudyBlocks(input.blocks) }),
     hasReflection: input.hasReflection,
   };
+  if (input.execution !== undefined)
+    entry.execution = validateExecution(
+      input.execution,
+      entry.blocks,
+      entry.durationMinutes,
+      entry.focusMinutes,
+      entry.status
+    );
   if (input.hasReflection) {
     const reflection = record(input.reflection);
     if (typeof reflection.notes !== "string" || reflection.notes.length > 5000)

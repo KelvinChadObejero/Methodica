@@ -2,10 +2,9 @@
 
 Updated 2026-11-09. For Kelvin and Andrei. This is the working backlog; update it in the same PR as the work. The [original review roadmap](docs/REVIEW_ROADMAP.md) is retained as a reference, not a second status tracker.
 
-Current implementation: **M5-02 / S4-02** (server-side history, immutable planned blocks and API reports), on `codex/server-history-and-reports`. **DB-03** is merged and deployed in [PR #7](https://github.com/KelvinChadObejero/Methodica/pull/7). **AUTH-RECOVERY depends on an owned, verified sender domain**: Resend was selected, but no domain is owned yet. Vercel CLI is connected; Resend is not provisioned.
+Current implementation: **M4-02** (timer execution records and duplicate-tab safety), on `codex/timer-execution-records`. **DB-03, M5-02 and S4-02** are merged and deployed in [PR #7](https://github.com/KelvinChadObejero/Methodica/pull/7) and [PR #8](https://github.com/KelvinChadObejero/Methodica/pull/8), with hosted import/history/report checks recorded in [release verification](docs/RELEASE_VERIFICATION.md). **AUTH-RECOVERY depends on an owned, verified sender domain**: Resend was selected, but no domain is owned yet. Vercel CLI is connected; Resend is not provisioned.
 
-
-Released: **DB-01, DB-02, WEB-01, M2-02, M3-02 and S3-02** are done in [PR #5](https://github.com/KelvinChadObejero/Methodica/pull/5), squash-merged and deployed on 2026-11-09 after source review, green CI and maintainer authorization. [Production verification](docs/RELEASE_VERIFICATION.md) confirms a complete two-block session, reflection, re-login, a second browser and account isolation. See [the data model](docs/DATA_MODEL.md) and [the class demo/browser-test guide](docs/CLASS_DEMO.md). QA-02 automation is implemented; manual screen-reader/contrast review and three-classmate testing remain open. Both packages pass lint/tests/build; 15 frontend tests, 11 API/database tests and 3 Chromium journeys pass, including failed saves, expiry recovery and 375px layouts.
+Released: **DB-01, DB-02, WEB-01, M2-02, M3-02 and S3-02** are done in [PR #5](https://github.com/KelvinChadObejero/Methodica/pull/5), squash-merged and deployed on 2026-11-09 after source review, green CI and maintainer authorization. [Production verification](docs/RELEASE_VERIFICATION.md) confirms a complete two-block session, reflection, re-login, a second browser and account isolation. See [the data model](docs/DATA_MODEL.md) and [the class demo/browser-test guide](docs/CLASS_DEMO.md). QA-02 automation is implemented; manual screen-reader/contrast review and three-classmate testing remain open. Both packages pass lint/tests/build; 19 frontend tests, 12 API/database tests and 4 Chromium journeys pass, including failed saves, expiry recovery and 375px layouts.
 
 The proposal v2 specifies React + TypeScript on web, React Native + Expo on mobile, and Node.js + Express + TypeScript with PostgreSQL and Prisma. Sections 7.2–7.3 and 13.2 establish the backend direction, with a caveat for instructor requirements. Keep the two Spring Boot projects as separate classroom assignments. Do not connect the website to two production APIs.
 
@@ -17,7 +16,7 @@ Established ownership: Andrei leads M1 accounts, M2 builder, and M3 StudyTypes. 
 
 ## Current implementation awaiting review
 
-All of these run locally on the Express development API. None imply that accounts, production PostgreSQL, or cross-device sync have shipped.
+These entries record the original local groundwork. Account deployment status is tracked above and in the milestone tables below.
 
 - [x] **FIX-01 · Both review:** fix timer lint failures, the stray CSS media-query brace, and settings duration bounds.
 - [x] **M2-LOCAL · Andrei reviews:** create/edit/delete named flows; add/remove/reorder blocks with keyboard-accessible buttons; validate durations and derive totals on the API.
@@ -30,7 +29,7 @@ All of these run locally on the Express development API. None imply that account
 - [x] **FIX-02 · Kelvin reviews:** restore saved theme on startup; make JSON/CSV exports respect the format and contain only Methodica data; reset browser preferences without deleting unrelated site storage.
 - [x] **QA-01 · Both review:** test timer timing/pause/skip/refresh, range analytics and CSV; integration-test API validation, parallel writes, restart persistence, corrupt-file preservation, and duplicate-save behavior; run tests in CI.
 - [x] **DEPLOY-FIX-01 · Both review:** use a compiled JavaScript Vercel entry point and smoke-test it in native Node; serve the public catalog without database storage; replace blank hosted pages with recovery and explicit browser-only workspace access. Device mode does not fulfill account/database/sync requirements.
-- [ ] **DEPLOY-QA-01 · Both:** verify the exact Vercel preview and production API/pages after each deployment, using [the deployment checklist](docs/DEPLOYMENT.md). Confirm database provisioning and environment configuration with team access before starting DB-02 hosting integration.
+- [x] **DEPLOY-QA-01 · Both:** verify the exact Vercel preview and production API/pages after each deployment, using [the deployment checklist](docs/DEPLOYMENT.md). Confirm database provisioning and environment configuration with team access before starting DB-02 hosting integration.
 
 ## Account foundation in review
 
@@ -38,7 +37,7 @@ All of these run locally on the Express development API. None imply that account
 
 - [x] **AUTH-01 · Andrei owns / Kelvin reviews:** registration, login/logout, persisted cookie sessions, password confirmation, account screens and expired-session handling. Better Auth uses scrypt/database sessions; see [the proposal adjustment](docs/AUTH.md).
 - [x] **AUTH-02 · Andrei owns / Kelvin reviews:** PostgreSQL/Prisma owner-scoped workspaces, row-lock mutations and tests for two-user access, revocation, expiry, CSRF origins, stale-tab scope and database throttling.
-- [ ] **AUTH-QA · Both:** review the PR, repeat signup → flow → timer → reflection → logout/login on its preview, and confirm production after merge. Device data must stay separate.
+- [x] **AUTH-QA · Both:** review the PR, repeat signup → flow → timer → reflection → logout/login on its preview, and confirm production after merge. Device data must stay separate.
 - [ ] **AUTH-RECOVERY · Andrei / Kelvin:** **Blocked: owned, verified sender domain.** Resend selected; Vercel CLI connected, but the maintainer confirmed no domain is owned yet. Email delivery, verification and password reset remain incomplete; M1-01 stays in progress.
 
 ## Next milestone: private student workspace
@@ -63,10 +62,10 @@ Do not mark RELEASE-01 done based only on a screen looking complete. It requires
 | ----- | -------- | -------------------------- | ------ | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | M2-02 | P1       | Andrei / Kelvin            | Done | DB-02        | Add the proposal's visual drag-and-drop builder while retaining keyboard reordering. Reopen the exact ordered blocks after signing in on another device. Warn before losing an unsaved draft on navigation.                                               |
 | M3-02 | P1       | Andrei / Kelvin            | Done | DB-02        | Complete Active Recall, Spaced Repetition, Interleaving, Feynman/self-explanation and other agreed techniques with source references, plain-language explanations, suggested durations, and quick-load blocks/templates. Persist StudyType relationships. |
-| M4-02 | P1       | Kelvin (proposed) / Andrei | To do  | DB-02        | Store block-level execution, completion and skip events. Verify background throttling, refresh, clock changes, interrupted network saves, tab closure, and duplicate tabs. Confirm transition alerts on real browsers.                                    |
-| M5-02 | P1       | Kelvin (proposed) / Andrei | In review  | DB-02, M1-02 | Add pagination and server-side filtering. Sessions keep historical titles/block snapshots when the source flow changes or is deleted. Legacy data migration is tested.                                                                                    |
+| M4-02 | P1       | Kelvin (proposed) / Andrei | In review  | DB-02        | Store block-level execution, completion and skip events. Verify background throttling, refresh, clock changes, interrupted network saves, tab closure, and duplicate tabs. Confirm transition alerts on real browsers.                                    |
+| M5-02 | P1       | Kelvin (proposed) / Andrei | Done  | DB-02, M1-02 | Add pagination and server-side filtering. Sessions keep historical titles/block snapshots when the source flow changes or is deleted. Legacy data migration is tested.                                                                                    |
 | S3-02 | P1       | Kelvin / Andrei            | Done | M1-02        | Reflections are private, one per session, update safely and survive re-login. Failed saves retain the user's notes.                                                                                                                                       |
-| S4-02 | P1       | Kelvin (proposed) / Andrei | In review  | M5-02        | Aggregate analytics in the API for large histories; agree on timezone, active-day/streak rules and partial-session treatment. Charts and exports agree for the same date range.                                                                           |
+| S4-02 | P1       | Kelvin (proposed) / Andrei | Done  | M5-02        | Aggregate analytics in the API for large histories; agree on timezone, active-day/streak rules and partial-session treatment. Charts and exports agree for the same date range.                                                                           |
 
 History/report implementation and acceptance evidence: [HISTORY_REPORTS.md](docs/HISTORY_REPORTS.md). Planned snapshots are stored; execution events remain M4-02.
 

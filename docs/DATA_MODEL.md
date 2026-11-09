@@ -27,7 +27,7 @@ erDiagram
 Imported templates are independent snapshots. `sourceTemplateId` records provenance
 without linking future edits or deletion. Templates remain private until S2-02.
 Session blocks are immutable planned snapshots on new records; old records
-omit missing details. Block execution events remain M4-02 work. See
+omit missing details. New timers also save validated per-block execution JSON; older records omit it. See
 [history and report queries](HISTORY_REPORTS.md). Mentor/admin access still needs
 an explicit permission design.
 

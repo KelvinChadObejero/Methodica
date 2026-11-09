@@ -47,16 +47,18 @@ Titles are trimmed, nonempty, at most 120 characters; subjects at most 60. A flo
 
 ## Session semantics
 
-`POST /api/sessions` takes `id`, `flowId`, `flowTitle`, `flowTag`, `subject`, `startedAt`, `durationMinutes`, `focusMinutes`, `status` (`completed | stopped`), and optional ordered `blocks`. The stable ID makes retrying an uncertain response safe. This endpoint accepts title/subject snapshots from the runner so an edit or deletion of its source flow cannot rewrite history. Account records use normalized study tables with an atomic compatibility mirror; see [DATA_MODEL.md](DATA_MODEL.md).
+`POST /api/sessions` takes `id`, `flowId`, `flowTitle`, `flowTag`, `subject`, `startedAt`, `durationMinutes`, `focusMinutes`, `status` (`completed | stopped`), optional ordered `blocks`, and optional versioned `execution`. The stable ID makes retrying an uncertain response safe. This endpoint accepts title/subject snapshots from the runner so an edit or deletion of its source flow cannot rewrite history. Account records use normalized study tables with an atomic compatibility mirror; see [DATA_MODEL.md](DATA_MODEL.md).
 
 Durations count actual running milliseconds, rounded down to whole seconds before submission. Paused time is excluded. Study time additionally excludes break blocks; skipped block time is never credited. An early finish or any skipped block is recorded as `stopped`, even if the remaining blocks finish. A session needs at least one second and cannot exceed 480 running minutes or its elapsed wall-clock time. The runner retains its own flow snapshot while running.
 
-The timer uses deadlines, advances over delayed ticks, and can pause before a break when auto-start is off. Its active run is retained in session storage in the current tab. It remains mounted across app navigation. Save failures retain the completed run and offer an explicit retry. This does not implement cross-tab locking, offline-first synchronization, or clock-tampering protection; those are follow-up work.
+The timer uses monotonic deadlines, advances over delayed callbacks, and can pause before a break when auto-start is off. Its active run is retained in session storage. Reopening recovers paused; Resume is explicit and closed-page time is not credited. A Web Lock coordinates tabs in the same browser profile. Save failures retain the completed run and offer an explicit retry with the same ID. Ordered execution events must agree with planned blocks, outcomes and measured totals. See [TIMER_EXECUTION.md](TIMER_EXECUTION.md) for timing, compatibility, alerts and limits.
 
 Comprehension/fatigue are integers 1–5; notes are text up to 5000 characters. One reflection can be updated per session. The development adapter saves timestamps in ISO form. Dashboard date ranges and streaks use the browser's local calendar days and study time greater than zero; a streak can end today or yesterday. The chart and report CSV cover the same selected range and captured cutoff; the displayed timezone is sent explicitly to the API. See the calendar/export rules in HISTORY_REPORTS.md.
 
 ## Storage and migration
 
 Hosted workspaces use normalized PostgreSQL study tables with composite owner-scoped keys. Transactions lock one account row while reading/mutating the study records and updating the JSON compatibility mirror, preventing lost updates across function instances. Legacy accounts migrate on first use with an exact round-trip check; failure preserves the original records. See [DATA_MODEL.md](DATA_MODEL.md) for rollback compatibility and deletion rules. The file adapter runs only when explicitly selected outside Vercel. Device workspaces never send private mutations or silently merge into accounts.
+
+CSV appends `blocks` and `execution` JSON cells to the existing summary columns; absent older fields are empty cells.
 
 Prisma migrations are checked in and applied before the Vercel build. Import/deletion policies remain in PROJECT_TODO.md. See [AUTH.md](AUTH.md).
