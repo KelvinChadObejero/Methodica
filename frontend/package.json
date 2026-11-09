@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "lint": "eslint .",
-    "test": "tsx --test test/timer.test.ts test/analytics.test.ts test/device-workspace.test.ts test/auth.test.ts",
+    "test": "tsx --test test/timer.test.ts test/analytics.test.ts test/device-workspace.test.ts test/auth.test.ts test/drafts.test.ts",
+    "test:e2e": "playwright test",
     "format": "prettier --write ."
   },
   "dependencies": {
@@ -17,6 +18,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.9.0",
+    "@playwright/test": "^1.65.0",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
