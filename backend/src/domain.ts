@@ -27,6 +27,8 @@ export interface StudyType {
   description: string;
   instructions: string;
   suggestedMinutes: number;
+  sources?: { title: string; url: string }[];
+  evidenceNote?: string;
 }
 
 export interface ReflectionEntry {

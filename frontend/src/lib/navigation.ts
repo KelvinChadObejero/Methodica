@@ -21,3 +21,7 @@ export function currentScreen(): Screen {
 export function navigate(screen: Screen) {
   window.location.hash = screen;
 }
+
+export function confirmNavigation() {
+  return window.dispatchEvent(new Event("methodica-before-navigate", { cancelable: true }));
+}

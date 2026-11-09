@@ -8,3 +8,5 @@ dist
 /backend/data/
 /backend/src/generated/
 /.vercel/
+/frontend/test-results/
+/frontend/playwright-report/

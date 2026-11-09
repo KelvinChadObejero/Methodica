@@ -29,7 +29,7 @@ Public endpoints also include `GET /api/preview`, returning `{workspace, studyTy
 | POST   | `/api/templates/:id/import` | Copy blocks into a saved flow. Repeated import returns the existing imported flow. Deleting that copy permits re-import.                                   |
 | POST   | `/api/flows/:id/publish`    | `{author}` creates/updates a template snapshot in this local collection. No public identity or rating is implied.                                          |
 
-All errors are JSON `{message}`. Validation errors return 400; missing records 404; duplicate conflicts/library limits 409; oversized bodies 413; storage errors 500. On Vercel, workspace routes return 503 until a durable production database adapter exists. Failed storage reads never reset the file to seed data. Responses are not cached.
+All errors are JSON `{message}`. Validation errors return 400; missing records 404; duplicate conflicts/library limits 409; oversized bodies 413; storage errors 500. On Vercel, workspace routes return 503 when account storage is unconfigured. Failed storage reads never reset existing data to seed data. Responses are not cached.
 
 ## Flow validation
 
@@ -37,7 +37,7 @@ Titles are trimmed, nonempty, at most 120 characters; subjects at most 60. A flo
 
 ## Session semantics
 
-`POST /api/sessions` takes `id`, `flowId`, `flowTitle`, `flowTag`, `subject`, `startedAt`, `durationMinutes`, `focusMinutes`, and `status` (`completed | stopped`). The stable ID makes retrying an uncertain response safe. This local endpoint accepts title/subject snapshots from the runner so an edit or deletion of its source flow cannot rewrite history.
+`POST /api/sessions` takes `id`, `flowId`, `flowTitle`, `flowTag`, `subject`, `startedAt`, `durationMinutes`, `focusMinutes`, and `status` (`completed | stopped`). The stable ID makes retrying an uncertain response safe. This endpoint accepts title/subject snapshots from the runner so an edit or deletion of its source flow cannot rewrite history. Account records use normalized study tables with an atomic compatibility mirror; see [DATA_MODEL.md](DATA_MODEL.md).
 
 Durations count actual running milliseconds, rounded down to whole seconds before submission. Paused time is excluded. Study time additionally excludes break blocks; skipped block time is never credited. An early finish or any skipped block is recorded as `stopped`, even if the remaining blocks finish. A session needs at least one second and cannot exceed 480 running minutes or its elapsed wall-clock time. The runner retains its own flow snapshot while running.
 
@@ -47,6 +47,6 @@ Comprehension/fatigue are integers 1–5; notes are text up to 5000 characters. 
 
 ## Storage and migration
 
-Hosted workspaces are PostgreSQL JSON documents keyed by the authenticated user. Transactions lock one account row during mutations, preventing lost updates across function instances. Normalized domain tables remain a follow-up migration. The file adapter runs only when explicitly selected outside Vercel. Device workspaces never send private mutations or silently merge into accounts.
+Hosted workspaces use normalized PostgreSQL study tables with composite owner-scoped keys. Transactions lock one account row while reading/mutating the study records and updating the JSON compatibility mirror, preventing lost updates across function instances. Legacy accounts migrate on first use with an exact round-trip check; failure preserves the original records. See [DATA_MODEL.md](DATA_MODEL.md) for rollback compatibility and deletion rules. The file adapter runs only when explicitly selected outside Vercel. Device workspaces never send private mutations or silently merge into accounts.
 
 Prisma migrations are checked in and applied before the Vercel build. Import/deletion policies remain in PROJECT_TODO.md. See [AUTH.md](AUTH.md).

@@ -8,16 +8,18 @@ datasource db {
 }
 
 model User {
-  id            String    @id
+  id            String         @id
   name          String
-  email         String    @unique
-  emailVerified Boolean   @default(false)
+  email         String         @unique
+  emailVerified Boolean        @default(false)
   image         String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
   sessions      Session[]
   accounts      Account[]
   workspace     Workspace?
+  studyFlows    StudyFlow[]
+  studySessions StudySession[]
 
   @@map("user")
 }
@@ -53,8 +55,8 @@ model Account {
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
-  @@index([userId])
   @@unique([providerId, accountId])
+  @@index([userId])
   @@map("account")
 }
 
@@ -79,11 +81,111 @@ model RateLimit {
   @@map("rateLimit")
 }
 
-// Account isolation comes first. Domain tables can replace this document in a
-// later migration without changing the public workspace API.
+// Transaction lock and compatibility mirror for older deployments. The digest
+// detects writes by the previous JSON adapter during a rolling upgrade/rollback.
 model Workspace {
-  userId    String   @id
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  data      Json
-  updatedAt DateTime @updatedAt
+  userId           String   @id
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  data             Json
+  updatedAt        DateTime @updatedAt
+  normalizedDigest String?
+}
+
+enum FlowKind {
+  flow
+  template
+}
+
+enum BlockKind {
+  focus
+  break
+  review
+  recall
+}
+
+enum StudySessionStatus {
+  completed
+  stopped
+}
+
+model StudyType {
+  id               String       @id
+  title            String
+  type             BlockKind
+  description      String
+  instructions     String
+  suggestedMinutes Int
+  sources          Json
+  evidenceNote     String?
+  blocks           StudyBlock[]
+}
+
+// Templates are private flow snapshots in their own ID namespace.
+model StudyFlow {
+  userId           String
+  kind             FlowKind
+  id               String
+  user             User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title            String
+  tag              String
+  position         Int
+  sourceTemplateId String?
+  author           String?
+  blocks           StudyBlock[]
+
+  @@id([userId, kind, id])
+  @@index([userId, kind, position])
+}
+
+model StudyBlock {
+  userId          String
+  flowKind        FlowKind
+  flowId          String
+  id              String
+  flow            StudyFlow  @relation(fields: [userId, flowKind, flowId], references: [userId, kind, id], onDelete: Cascade)
+  position        Int
+  title           String
+  type            BlockKind
+  durationMinutes Int
+  studyTypeId     String?
+  studyType       StudyType? @relation(fields: [studyTypeId], references: [id], onDelete: Restrict)
+
+  @@id([userId, flowKind, flowId, id])
+  @@unique([userId, flowKind, flowId, position])
+  @@index([studyTypeId])
+}
+
+model StudySession {
+  userId          String
+  id              String
+  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  position        Int
+  // Historical source ID/title/tag survive flow edits and deletion. No live FK.
+  flowId          String
+  flowTitle       String
+  flowTag         String
+  startedAt       DateTime
+  durationMinutes Float
+  focusMinutes    Float
+  subject         String
+  status          StudySessionStatus
+  log             SessionLog?
+
+  @@id([userId, id])
+  @@index([userId, startedAt])
+  @@index([userId, subject])
+}
+
+// One private reflection per study session, distinct from Better Auth's Session.
+model SessionLog {
+  userId          String
+  sessionId       String
+  session         StudySession @relation(fields: [userId, sessionId], references: [userId, id], onDelete: Cascade)
+  sessionTitle    String
+  sessionSubtitle String
+  comprehension   Int
+  fatigue         Int
+  notes           String
+
+  @@id([userId, sessionId])
 }
