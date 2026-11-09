@@ -3,6 +3,15 @@ import { useWorkspace } from "../lib/useWorkspace";
 import { errorMessage } from "../lib/api";
 import { navigate } from "../lib/navigation";
 import type { SessionLog } from "../types";
+import {
+  clearDraft,
+  draftKey,
+  isReflectionDraft,
+  readDraft,
+  writeDraft,
+  type ReflectionDraft,
+} from "../lib/drafts";
+import { useUnsavedChanges } from "../lib/useUnsavedChanges";
 
 function selectedSessionId() {
   try {
@@ -12,13 +21,35 @@ function selectedSessionId() {
   }
 }
 function ReflectionForm({ session }: { session: SessionLog }) {
-  const { saveReflection } = useWorkspace();
-  const [comprehension, setComprehension] = useState(session.reflection?.comprehension || 3);
-  const [fatigue, setFatigue] = useState(session.reflection?.fatigue || 3);
-  const [notes, setNotes] = useState(session.reflection?.notes || "");
+  const { saveReflection, mode, user } = useWorkspace();
+  const storageKey = draftKey(
+    mode === "device" ? "device" : `account-${user?.id}`,
+    `reflection-${session.id}`
+  );
+  const [restored] = useState(() => readDraft(storageKey, isReflectionDraft));
+  const [comprehension, setComprehension] = useState(
+    restored?.comprehension ?? session.reflection?.comprehension ?? 3
+  );
+  const [fatigue, setFatigue] = useState(restored?.fatigue ?? session.reflection?.fatigue ?? 3);
+  const [notes, setNotes] = useState(restored?.notes ?? session.reflection?.notes ?? "");
+  const [dirty, setDirty] = useState(!!restored);
+  const [draftError, setDraftError] = useState("");
+  useUnsavedChanges(dirty);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  function update(change: Partial<ReflectionDraft>) {
+    const next = { comprehension, fatigue, notes, ...change };
+    setComprehension(next.comprehension);
+    setFatigue(next.fatigue);
+    setNotes(next.notes);
+    setDirty(true);
+    setDraftError(
+      writeDraft(storageKey, next)
+        ? ""
+        : "This browser cannot keep a recovery draft. Keep this page open until your reflection saves."
+    );
+  }
   async function submit(event: FormEvent) {
     event.preventDefault();
     setBusy(true);
@@ -27,6 +58,9 @@ function ReflectionForm({ session }: { session: SessionLog }) {
     try {
       await saveReflection(session.id, { comprehension, fatigue, notes });
       setSubmitted(true);
+      setDirty(false);
+      clearDraft(storageKey);
+      setDraftError("");
     } catch (cause) {
       setError(errorMessage(cause));
     } finally {
@@ -40,6 +74,11 @@ function ReflectionForm({ session }: { session: SessionLog }) {
         {session.subject} · {new Date(session.startedAt).toLocaleString()} ·{" "}
         {session.durationMinutes.toFixed(1)} min
       </p>
+      {restored && dirty && (
+        <p className="feedback">
+          Your unsaved reflection was restored from this tab. Save it to update your session.
+        </p>
+      )}
       <fieldset disabled={busy} onChange={() => setSubmitted(false)}>
         <div className="slider-block">
           <label className="top" htmlFor="comprehension">
@@ -52,7 +91,7 @@ function ReflectionForm({ session }: { session: SessionLog }) {
             min={1}
             max={5}
             value={comprehension}
-            onChange={(event) => setComprehension(Number(event.target.value))}
+            onChange={(event) => update({ comprehension: Number(event.target.value) })}
           />
           <div className="scale-labels">
             <span>Foggy</span>
@@ -70,7 +109,7 @@ function ReflectionForm({ session }: { session: SessionLog }) {
             min={1}
             max={5}
             value={fatigue}
-            onChange={(event) => setFatigue(Number(event.target.value))}
+            onChange={(event) => update({ fatigue: Number(event.target.value) })}
           />
           <div className="scale-labels">
             <span>Fresh</span>
@@ -83,7 +122,7 @@ function ReflectionForm({ session }: { session: SessionLog }) {
             maxLength={5000}
             placeholder="Optional notes for your next session…"
             value={notes}
-            onChange={(event) => setNotes(event.target.value)}
+            onChange={(event) => update({ notes: event.target.value })}
           />
         </label>
         <button className="btn full-width" type="submit">
@@ -93,6 +132,11 @@ function ReflectionForm({ session }: { session: SessionLog }) {
       {error && (
         <p className="feedback" role="alert">
           {error}
+        </p>
+      )}
+      {draftError && (
+        <p className="feedback" role="alert">
+          {draftError}
         </p>
       )}
       {submitted && (

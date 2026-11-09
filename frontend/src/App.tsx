@@ -11,7 +11,7 @@ import Settings from "./screens/Settings";
 import Timer from "./screens/Timer";
 import CrudDemo from "./screens/CrudDemo";
 import Auth from "./screens/Auth";
-import { currentScreen, navigate } from "./lib/navigation";
+import { confirmNavigation, currentScreen, navigate } from "./lib/navigation";
 import { useWorkspace } from "./lib/useWorkspace";
 
 export default function App() {
@@ -29,7 +29,17 @@ export default function App() {
     "register",
   ].includes(screen);
   useEffect(() => {
+    let acceptedHash = window.location.hash;
     const change = () => {
+      if (!confirmNavigation()) {
+        window.history.replaceState(
+          null,
+          "",
+          window.location.pathname + window.location.search + acceptedHash
+        );
+        return;
+      }
+      acceptedHash = window.location.hash;
       setScreen(currentScreen());
       document.querySelector("main")?.scrollTo(0, 0);
     };
@@ -70,6 +80,7 @@ export default function App() {
                   className="btn ghost"
                   disabled={loggingOut}
                   onClick={async () => {
+                    if (!confirmNavigation()) return;
                     setLoggingOut(true);
                     setAccountError("");
                     try {
@@ -173,9 +184,9 @@ export default function App() {
         {data && (
           <>
             {screen === "dashboard" && <Dashboard />}
-            {screen === "builder" && <FlowBuilder />}
+            {screen === "builder" && <FlowBuilder key={`${mode}-${user?.id}`} />}
             {screen === "community" && <CommunityHub />}
-            {screen === "reflect" && <Reflection />}
+            {screen === "reflect" && <Reflection key={`${mode}-${user?.id}`} />}
             {screen === "history" && <SessionHistory />}
             <div hidden={screen !== "timer"}>
               <Timer key={`${mode}-${mode === "server" ? user?.id : "guest"}`} />

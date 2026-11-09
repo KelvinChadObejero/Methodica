@@ -28,8 +28,8 @@ Open http://localhost:5173. Vite proxies `/api` to `127.0.0.1:4000`; both proces
 
 - Accounts: email/password registration, login/logout, restored sessions and private PostgreSQL workspaces.
 - Device import: review and explicitly copy browser flows, sessions/reflections and private templates into an account without clearing local data or overwriting account records. See [the import guide](docs/DEVICE_IMPORT.md).
-- Flow library: create, rename, edit, delete, add/remove/reorder blocks, calculate duration.
-- Technique toolkit and starter templates; import a template into the library and publish a saved flow to the local collection.
+- Flow library: create, rename, edit, delete, add/remove/reorder blocks by dragging or keyboard, calculate duration, and recover unsaved drafts in the same tab.
+- Technique toolkit with research references and quick-load blocks; import a starter template into the library and publish a saved flow to the private collection.
 - Timer using saved flows, pause/resume, skip, actual elapsed study time, and recovery after refresh in the same tab.
 - Sessions and editable reflections saved in the selected workspace; searchable/filterable history.
 - Dashboard summaries, subject breakdown, streaks and reports based on saved sessions.
@@ -41,7 +41,7 @@ On the hosted website, create an account or log in to save a private workspace. 
 
 ## Account and deployment foundation
 
-PostgreSQL and Prisma now persist accounts and owner-scoped workspace documents. Better Auth manages password hashes and revocable session cookies. [AUTH.md](docs/AUTH.md) explains this session/hash choice relative to the proposal. Email recovery, verification, mentor roles, normalized study tables and automatic live synchronization remain on the checklist.
+PostgreSQL and Prisma persist accounts and normalized study tables with enforced ownership. [DATA_MODEL.md](docs/DATA_MODEL.md) records the schema, safe migration and compatibility mirror. Better Auth manages password hashes and revocable session cookies. [AUTH.md](docs/AUTH.md) explains this session/hash choice relative to the proposal. Email recovery, verification, mentor roles and automatic live synchronization remain on the checklist.
 
 Vercel applies migrations, then builds a small CommonJS bridge and self-contained ESM server bundle. Native Node checks exercise the collected package scope and authenticated database requests. See [DEPLOYMENT.md](docs/DEPLOYMENT.md) and [backend setup](backend/README.md).
 
@@ -65,7 +65,7 @@ npm test
 npm run build
 ```
 
-GitHub Actions runs those checks for both packages. API tests use a temporary file for the legacy adapter and a disposable PostgreSQL database for accounts. It never changes your development workspace. Frontend tests cover deadline timing, pause/skip/reset behavior, analytics and CSV exports.
+GitHub Actions runs those checks for both packages. API tests use a temporary file for the legacy adapter and a disposable PostgreSQL database for accounts. It never changes your development workspace. Frontend tests cover deadline timing, pause/skip/reset behavior, analytics, CSV exports and isolated recovery drafts. `npm run test:e2e` in frontend runs the complete two-block browser journey, failed-save recovery, another browser and a second account. See [the class demo and browser-test guide](docs/CLASS_DEMO.md).
 
 ## Structure
 

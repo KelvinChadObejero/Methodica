@@ -13,7 +13,8 @@ export default function StudyTypes() {
       <h1 className="page-title">Find your next technique.</h1>
       <p className="page-sub">
         A starting toolkit for focused practice, retrieval, and reflection. Combine these blocks in
-        your flow builder.
+        your flow builder. Suggested minutes are editable starting points, not research-prescribed
+        durations.
       </p>
       <label className="search-label">
         Search techniques
@@ -34,6 +35,21 @@ export default function StudyTypes() {
             <h2>{item.title}</h2>
             <p className="muted">{item.description}</p>
             <p>{item.instructions}</p>
+            {item.evidenceNote && <p className="muted">{item.evidenceNote}</p>}
+            {!!item.sources?.length && (
+              <details className="technique-sources">
+                <summary>Research references</summary>
+                <ul>
+                  {item.sources.map((source) => (
+                    <li key={source.url}>
+                      <a href={source.url} target="_blank" rel="noreferrer">
+                        {source.title}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
             <button
               className="btn ghost"
               onClick={() => {

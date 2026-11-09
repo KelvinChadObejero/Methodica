@@ -4,6 +4,8 @@ import { useWorkspace } from "../lib/useWorkspace";
 import { errorMessage } from "../lib/api";
 import { loadPrefs } from "../lib/preferences";
 import { navigate } from "../lib/navigation";
+import { clearDraft, draftKey, isFlowDraft, readDraft, writeDraft } from "../lib/drafts";
+import { useUnsavedChanges } from "../lib/useUnsavedChanges";
 
 function newFlow(technique?: StudyType): StudyFlow {
   return {
@@ -24,25 +26,45 @@ function newFlow(technique?: StudyType): StudyFlow {
 }
 
 export default function FlowBuilder() {
-  const { data, studyTypes, saveFlow, deleteFlow } = useWorkspace();
-  const [draft, setDraft] = useState<StudyFlow>(() =>
-    newFlow(
-      studyTypes.find(
-        (item) =>
-          item.id === new URLSearchParams(window.location.hash.split("?")[1] || "").get("technique")
+  const { data, studyTypes, mode, user, saveFlow, deleteFlow } = useWorkspace();
+  const storageKey = draftKey(mode === "device" ? "device" : `account-${user?.id}`, "builder");
+  const [restored] = useState(() => readDraft(storageKey, isFlowDraft));
+  const [draft, setDraft] = useState<StudyFlow>(
+    () =>
+      restored?.flow ||
+      newFlow(
+        studyTypes.find(
+          (item) =>
+            item.id ===
+            new URLSearchParams(window.location.hash.split("?")[1] || "").get("technique")
+        )
       )
-    )
   );
-  const [isNew, setIsNew] = useState(true);
+  const [isNew, setIsNew] = useState(restored?.isNew ?? true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
-  const [dirty, setDirty] = useState(false);
+  const [message, setMessage] = useState(
+    restored
+      ? "Your unsaved flow was restored from this tab. Save it to keep it in your workspace."
+      : ""
+  );
+  const [dirty, setDirty] = useState(!!restored);
+  const [draftError, setDraftError] = useState("");
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<string | null>(null);
+  const [announcement, setAnnouncement] = useState("");
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const total = draft.blocks.reduce((sum, block) => sum + block.durationMinutes, 0);
+  useUnsavedChanges(dirty);
 
   function update(change: Partial<StudyFlow>) {
-    setDraft((prev) => ({ ...prev, ...change }));
+    const next = { ...draft, ...change };
+    setDraft(next);
+    setDraftError(
+      writeDraft(storageKey, { flow: next, isNew })
+        ? ""
+        : "This browser cannot keep a recovery draft. Keep this page open until your flow saves."
+    );
     setDirty(true);
     setMessage("");
   }
@@ -59,11 +81,19 @@ export default function FlowBuilder() {
     setMessage("");
     setDirty(false);
     setPendingDelete(null);
+    clearDraft(storageKey);
+    setDraftError("");
   }
   function move(index: number, offset: number) {
+    reorder(index, index + offset);
+  }
+  function reorder(from: number, to: number) {
+    if (from === to || from < 0 || to < 0 || to >= draft.blocks.length) return;
     const blocks = [...draft.blocks];
-    [blocks[index], blocks[index + offset]] = [blocks[index + offset], blocks[index]];
+    const [moved] = blocks.splice(from, 1);
+    blocks.splice(to, 0, moved);
     update({ blocks });
+    setAnnouncement(`${moved.title} moved to block ${to + 1} of ${blocks.length}.`);
   }
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -75,6 +105,8 @@ export default function FlowBuilder() {
       setDraft(structuredClone(saved));
       setIsNew(false);
       setDirty(false);
+      clearDraft(storageKey);
+      setDraftError("");
       setMessage("Flow saved. It is ready in your study timer.");
     } catch (cause) {
       setError(errorMessage(cause));
@@ -92,6 +124,7 @@ export default function FlowBuilder() {
         setDraft(newFlow());
         setIsNew(true);
         setDirty(false);
+        clearDraft(storageKey);
       }
       setMessage("Flow deleted. Your session history is preserved.");
     } catch (cause) {
@@ -192,10 +225,53 @@ export default function FlowBuilder() {
                 />
               </label>
             </div>
-            <div className="block-list">
+            <p id="block-order-help" className="muted">
+              Drag a block number to change the order, or use Move up and Move down.
+            </p>
+            <p className="sr-only" role="status">
+              {announcement}
+            </p>
+            <div className="block-list" role="list" aria-label="Study blocks">
               {draft.blocks.map((block, index) => (
-                <div className="block-editor" key={block.id}>
-                  <div className="block-number">{String(index + 1).padStart(2, "0")}</div>
+                <div
+                  className={`block-editor${draggedId === block.id ? " dragging" : ""}${dropTarget === block.id && draggedId !== block.id ? " drop-target" : ""}`}
+                  key={block.id}
+                  role="listitem"
+                  onDragOver={(event) => {
+                    if (!draggedId || busy) return;
+                    event.preventDefault();
+                    event.dataTransfer.dropEffect = "move";
+                    setDropTarget(block.id);
+                  }}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    if (draggedId && !busy)
+                      reorder(
+                        draft.blocks.findIndex((item) => item.id === draggedId),
+                        index
+                      );
+                    setDraggedId(null);
+                    setDropTarget(null);
+                  }}
+                >
+                  <button
+                    type="button"
+                    className="block-number drag-handle"
+                    draggable={!busy}
+                    aria-label={`Drag block ${index + 1}`}
+                    aria-describedby="block-order-help"
+                    onDragStart={(event) => {
+                      event.dataTransfer.effectAllowed = "move";
+                      event.dataTransfer.setData("text/plain", block.id);
+                      setDraggedId(block.id);
+                    }}
+                    onDragEnd={() => {
+                      setDraggedId(null);
+                      setDropTarget(null);
+                    }}
+                  >
+                    {String(index + 1).padStart(2, "0")} ⠿
+                  </button>
                   <div className="block-fields">
                     <label>
                       Block name
@@ -342,6 +418,11 @@ export default function FlowBuilder() {
           {error && (
             <p className="feedback" role="alert">
               {error}
+            </p>
+          )}
+          {draftError && (
+            <p className="feedback" role="alert">
+              {draftError}
             </p>
           )}
           {message && (
