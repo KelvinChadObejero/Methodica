@@ -1,5 +1,35 @@
 # Private workspace release — 2026-11-09
 
+## Timer execution release
+
+[PR #9](https://github.com/KelvinChadObejero/Methodica/pull/9) completes M4-02.
+Its reviewed head `34ccc9390a959097979a544fc612676d4aa12f15` passed both CI
+sets: frontend lint/build and 22 tests, PostgreSQL 17 backend lint/build and 13
+tests, and five Chromium journeys. Squash merge
+`698bb6deb4e61fcaa5d23c7175a91c3613729c19` is the source of READY production
+deployment `dpl_HMeZ6pfdEr1qd1fcddZVU9LDf5GH`, aliased to the public domain.
+
+A separate full-Chromium production journey completed two real one-minute
+blocks, refreshed and explicitly resumed, blocked a duplicate tab, ignored a
+one-hour `Date.now()` change, and constructed permitted transition notifications.
+A successful database commit whose response was deliberately lost was retried
+with the same ID: exactly one session remained, with two completed block records
+and four execution events. Reflection failure/recovery, update, re-login, a
+separate 375px browser and second-account isolation all passed. The isolation
+request uses the actual site's trusted Origin; a localhost Origin was correctly
+rejected by CSRF protection during the initial test attempt.
+
+The local/CI device journey additionally closed the owning tab, acquired control
+in its duplicate, resumed the original ID, skipped a block and saved one partial
+session with matching skip/stop events. The 375px execution timeline was visually
+checked. Reopened timers intentionally remain paused and exclude closed-page
+time; see [timing and checkpoint limits](TIMER_EXECUTION.md).
+
+Four additional main tasks are now released across PRs #7–9: DB-03, M5-02,
+S4-02 and M4-02. Email recovery, mentor permissions and manual/operational
+acceptance remain open. The maintainer approved selected-session, revocable
+read-only mentor sharing as the next implementation on 2026-11-09.
+
 ## Backup, history and report release
 
 [PR #7](https://github.com/KelvinChadObejero/Methodica/pull/7) and

@@ -26,8 +26,9 @@ Delayed callbacks catch up across block boundaries once. Focus updates the
 display immediately. Background time counts while the page remains running.
 
 Refresh/reopening recovers the most recent checkpoint **paused**. Resume is
-explicit. Time while the page was closed or reloading is not credited; at most
-one checkpoint interval (250 ms) before closure is absent. This also avoids
+explicit. Time while the page was closed or reloading is not credited. Work
+after the last saved checkpoint may be absent; callbacks normally run every
+250 ms, but background throttling or abrupt closure can increase that gap. This avoids
 using a wall-clock jump during closure as study time. A completed failed save
 keeps its exact payload and stable ID. Recovery checks whether that ID already
 saved before allowing another run or retry. A committed success whose response

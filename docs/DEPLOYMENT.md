@@ -10,6 +10,14 @@ Neon is connected through Vercel. Preview and production currently use the same 
 
 ## Runtime package
 
+Hosted Prisma CLI commands select the Marketplace's `DATABASE_URL_UNPOOLED`
+(or `POSTGRES_URL_NON_POOLING`) for migrations; application queries continue to
+use pooled `DATABASE_URL`. Local/test CLI commands use their explicit
+`DATABASE_URL`, so disposable databases do not pick up hosted credentials.
+This prevents session-scoped migration advisory locks from being stranded
+behind transaction pooling. Do not disable advisory locking to bypass a build
+failure. See [Neon's Prisma guide](https://neon.com/docs/guides/prisma).
+
 The backend's dedicated output directory is dist/vercel. Its index.cjs is a tiny CommonJS bridge importing server.mjs, a self-contained ESM bundle. Better Auth requires ESM. This also handles Vercel collecting the entry under a CommonJS package scope, which previously caused function startup crashes. npm dependencies are bundled; only Node builtins remain external. Do not point outputDirectory at the wider dist folder, where the builder can select a competing app.js.
 
 Backend tests exercise the exact native entry and a collected isolated CommonJS package scope. Account tests also perform registration and authenticated PostgreSQL reads through the compiled deployment bundle, asserting Secure/HttpOnly production cookies.
