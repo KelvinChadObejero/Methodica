@@ -1006,15 +1006,46 @@ test(
         0
       );
       // Page more than 25 grants without exposing any unshared reflection.
-      await new AccountWorkspace(db, owner.body.user.id).update(data=>{
-        data.sessions.push(...Array.from({length:26},(_,index)=>({...session,id:`share-page-session-${index}`,status:"completed" as const,hasReflection:false})));
+      await new AccountWorkspace(db, owner.body.user.id).update((data) => {
+        data.sessions.push(
+          ...Array.from({ length: 26 }, (_, index) => ({
+            ...session,
+            id: `share-page-session-${index}`,
+            status: "completed" as const,
+            hasReflection: false,
+          }))
+        );
       });
-      await db.sessionShare.createMany({data:Array.from({length:26},(_,index)=>({id:`share-page-${index}`,ownerId:owner.body.user.id,sessionId:`share-page-session-${index}`,recipientId:mentor.body.user.id,includeReflection:false}))});
-      const page1=(await request("/shared-sessions","GET",undefined,mentor.cookie)).body;
-      const page2=(await request("/shared-sessions?offset=25","GET",undefined,mentor.cookie)).body;
-      assert.equal(page1.total,26);assert.equal(page1.items.length,25);assert.equal(page1.nextOffset,25);assert.equal(page2.items.length,1);
-      assert(!page1.items.some((first:{id:string})=>page2.items.some((second:{id:string})=>first.id===second.id)));
-      await assert.rejects(db.sessionShare.create({data:{ownerId:mentor.body.user.id,sessionId:session.id,recipientId:other.body.user.id}}));
+      await db.sessionShare.createMany({
+        data: Array.from({ length: 26 }, (_, index) => ({
+          id: `share-page-${index}`,
+          ownerId: owner.body.user.id,
+          sessionId: `share-page-session-${index}`,
+          recipientId: mentor.body.user.id,
+          includeReflection: false,
+        })),
+      });
+      const page1 = (await request("/shared-sessions", "GET", undefined, mentor.cookie)).body;
+      const page2 = (await request("/shared-sessions?offset=25", "GET", undefined, mentor.cookie))
+        .body;
+      assert.equal(page1.total, 26);
+      assert.equal(page1.items.length, 25);
+      assert.equal(page1.nextOffset, 25);
+      assert.equal(page2.items.length, 1);
+      assert(
+        !page1.items.some((first: { id: string }) =>
+          page2.items.some((second: { id: string }) => first.id === second.id)
+        )
+      );
+      await assert.rejects(
+        db.sessionShare.create({
+          data: {
+            ownerId: mentor.body.user.id,
+            sessionId: session.id,
+            recipientId: other.body.user.id,
+          },
+        })
+      );
       await request(
         path,
         "POST",

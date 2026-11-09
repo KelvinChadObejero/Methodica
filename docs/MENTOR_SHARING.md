@@ -74,5 +74,8 @@ revocation, duplicate grants, private-route denials, CSRF, source-flow deletion,
 malicious permission fields in imports, and deletion cascades. The browser
 student journey continues from its persisted session through named-account
 confirmation, read-only viewing, reflection permission changes and revocation,
-with 375px owner/mentor layouts. Existing account, history, reporting and timer
+with 375px owner/mentor layouts. Failed permission reads never claim that nobody
+has access; a lost committed sharing response is refreshed and safely retried.
+A delayed 401 from an old account cannot expire a newly signed-in account.
+Existing account, history, reporting and timer
 regressions remain required.

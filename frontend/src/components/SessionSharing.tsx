@@ -53,6 +53,7 @@ export default function SessionSharing({ sessionId }: { sessionId: string }) {
   const label = useId();
   const [grants, setGrants] = useState<SessionGrant[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [feedback, setFeedback] = useState("");
@@ -65,10 +66,15 @@ export default function SessionSharing({ sessionId }: { sessionId: string }) {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    setLoaded(false);
+    setFeedback("");
     setError("");
     void api<SessionGrant[]>(path)
       .then((data) => {
-        if (!cancelled) setGrants(data);
+        if (!cancelled) {
+          setGrants(data);
+          setLoaded(true);
+        }
       })
       .catch((cause) => {
         if (!cancelled) setError(errorMessage(cause));
@@ -118,6 +124,7 @@ export default function SessionSharing({ sessionId }: { sessionId: string }) {
       setFeedback(`This session is shared read-only with ${saved.recipient.name}.`);
     } catch (cause) {
       setError(errorMessage(cause));
+      setLoaded(false);
     } finally {
       setBusy(false);
     }
@@ -134,6 +141,7 @@ export default function SessionSharing({ sessionId }: { sessionId: string }) {
       setFeedback("Sharing permissions updated.");
     } catch (cause) {
       setError(errorMessage(cause));
+      setLoaded(false);
     } finally {
       setBusy(false);
     }
@@ -148,6 +156,7 @@ export default function SessionSharing({ sessionId }: { sessionId: string }) {
       setFeedback(`Access revoked for ${grant.recipient.name}.`);
     } catch (cause) {
       setError(errorMessage(cause));
+      setLoaded(false);
     } finally {
       setBusy(false);
     }
@@ -161,7 +170,7 @@ export default function SessionSharing({ sessionId }: { sessionId: string }) {
       </p>
       {loading ? (
         <p role="status">Loading sharing permissions...</p>
-      ) : (
+      ) : loaded ? (
         <>
           <form onSubmit={(event) => void lookup(event)}>
             <label>
@@ -217,7 +226,9 @@ export default function SessionSharing({ sessionId }: { sessionId: string }) {
             notes, ratings and later updates. Account codes identify existing accounts; no email or
             invitation is sent.
           </p>
-          {grants.length ? (
+          {busy ? (
+            <p role="status">Waiting for the study service...</p>
+          ) : grants.length ? (
             <div aria-label="People with access">
               {grants.map((grant) => (
                 <GrantAccess
@@ -233,7 +244,7 @@ export default function SessionSharing({ sessionId }: { sessionId: string }) {
             <p>No one else has access to this session.</p>
           )}
         </>
-      )}
+      ) : null}
       {error && (
         <p role="alert">
           {error}{" "}

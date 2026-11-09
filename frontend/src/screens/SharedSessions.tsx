@@ -183,7 +183,8 @@ function AccountSharedSessions() {
           <p>Shared by {detail.ownerName}</p>
           <p>
             {detail.session.subject} · {new Date(detail.session.startedAt).toLocaleString()} ·{" "}
-            {detail.session.durationMinutes.toFixed(1)} min elapsed
+            {detail.session.durationMinutes.toFixed(1)} min{" "}
+            {detail.session.timingSource === "legacy-estimate" ? "estimated" : "elapsed"}
           </p>
           <p>
             {detail.session.timingSource === "legacy-estimate"

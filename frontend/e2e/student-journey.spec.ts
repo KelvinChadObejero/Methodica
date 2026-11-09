@@ -249,8 +249,28 @@ test("student builds, completes two blocks, recovers a failed reflection and reo
   const mentorCode = await bob.getByLabel("My account code", { exact: true }).inputValue();
   await page.setViewportSize({ width: 375, height: 812 });
   await page.getByRole("button", { name: "Session History", exact: true }).click();
+  let failPermissionRead = true,
+    loseShareResponse = true;
+  await page.route("**/api/sessions/*/shares", async (route) => {
+    if (route.request().method() === "GET" && failPermissionRead) {
+      return route.fulfill({ status: 503, json: { message: "Temporary permissions failure" } });
+    }
+    if (route.request().method() === "POST" && loseShareResponse) {
+      loseShareResponse = false;
+      const committed = await route.fetch();
+      expect(committed.status()).toBe(200);
+      return route.fulfill({ status: 503, json: { message: "Share success response lost" } });
+    }
+    return route.continue();
+  });
   await page.getByRole("button", { name: "Share session", exact: true }).click();
   const sharing = page.getByRole("region", { name: "Share only this session.", exact: true });
+  await expect(sharing.getByRole("alert")).toBeVisible();
+  await expect(
+    sharing.getByText("No one else has access to this session.", { exact: true })
+  ).toHaveCount(0);
+  failPermissionRead = false;
+  await sharing.getByRole("button", { name: "Refresh permissions", exact: true }).click();
   await sharing.getByLabel("Mentor account code", { exact: true }).fill(mentorCode);
   await sharing.getByRole("button", { name: "Find account", exact: true }).click();
   await expect(sharing.getByText(/Named account:/)).toContainText("Another student");
@@ -264,7 +284,17 @@ test("student builds, completes two blocks, recovers a failed reflection and reo
   ).not.toBeChecked();
   await sharing.getByLabel("Share only this session with Another student", { exact: true }).check();
   await sharing.getByRole("button", { name: "Confirm read-only sharing", exact: true }).click();
+  await expect(sharing.getByRole("alert")).toBeVisible();
+  await expect(
+    sharing.getByText("No one else has access to this session.", { exact: true })
+  ).toHaveCount(0);
+  await sharing.getByRole("button", { name: "Refresh permissions", exact: true }).click();
+  await expect(sharing.locator(".sharing-grant")).toHaveCount(1);
+  await sharing.getByRole("button", { name: "Confirm read-only sharing", exact: true }).click();
   await expect(sharing.getByRole("status")).toContainText("shared read-only");
+  expect(
+    await (await page.request.get(`/api/sessions/${saved.sessions[0].id}/shares`)).json()
+  ).toHaveLength(1);
   await bob.setViewportSize({ width: 375, height: 812 });
   await bob.getByRole("button", { name: "Refresh shared list", exact: true }).click();
   await bob.getByRole("button", { name: "View shared session", exact: true }).click();
@@ -288,7 +318,9 @@ test("student builds, completes two blocks, recovers a failed reflection and reo
   ).toBe(404);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   expect(await bob.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.locator("#main-content").focus();
   await page.screenshot({ path: testInfo.outputPath("mobile-sharing-owner.png"), fullPage: true });
+  await bob.locator("#main-content").focus();
   await bob.screenshot({
     path: testInfo.outputPath("mobile-read-only-mentor.png"),
     fullPage: true,
