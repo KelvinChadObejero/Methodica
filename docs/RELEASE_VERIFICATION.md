@@ -1,4 +1,55 @@
-# Private workspace release — 2026-11-09
+# Private workspace releases — November 9–10, 2026
+
+## Selected-session sharing and student acceptance — November 10
+
+[PR #11](https://github.com/KelvinChadObejero/Methodica/pull/11) completes
+M1-02 under the maintainer's explicit selected-session sharing rule. Reviewed
+head `52add62a6f0733c00fa084d23a5dbdc32b33fda8` passed both CI sets:
+frontend lint/build and 23 tests, PostgreSQL 17 backend lint/build and 14 tests,
+and five Chromium journeys. Its exact Vercel preview reached READY; health
+reported PostgreSQL and anonymous sharing requests returned 401.
+
+Squash merge `c9210b2c80f0f3a42be94742bff9a729663a2ed6` is the source of
+READY production deployment `dpl_5GhhrMgfxtCfWTMTEV1cyeTSfQig`. Its aliases
+include [the public Methodica site](https://methodica-azure.vercel.app).
+A separate full-Chromium journey against that public domain passed in 2.7
+minutes, using only synthetic QA accounts:
+
+1. Register a student, save an ordered two-block flow, complete two actual
+   one-minute blocks, and retain one session after losing a committed save
+   response and retrying. Refresh/resume, duplicate-tab control, a wall-clock
+   jump and permitted transition notifications were exercised again.
+2. Recover a failed reflection save, update it after re-login, and reopen the
+   same persisted flow/session/notes in a separate 375px browser context.
+   A second account starts with no private history and cannot write its log.
+3. Look up that second account's code without granting access, explicitly
+   confirm the named account and selected session, and keep reflections
+   excluded by default. Failed permission reads show unknown state. A
+   committed share whose response is lost can be refreshed and retried with
+   exactly one grant remaining.
+4. Read the selected session as its recipient without editing controls. Opt
+   reflection access in, refresh and read the current notes; opt out and
+   confirm they disappear on the next read. The ordinary reflection write
+   route still returns 404 to the recipient. Both 375px layouts have no
+   horizontal page overflow.
+5. Revoke the grant and refresh the recipient's detail. Access is denied,
+   the previously displayed detail is cleared, and the refreshed shared list
+   is empty. The student's private session remains intact.
+
+The API/database suite additionally proves three-account isolation, paginated
+received grants, composite ownership foreign keys, deletion cascades and that
+imported study data cannot fabricate permissions. See [the policy and API](MENTOR_SHARING.md).
+Revocation stops future reads; it cannot erase previously received copies.
+These are browser-context checks, not a physical mobile-device or manual
+screen-reader test.
+
+This closes **M1-02 and RELEASE-01**. Together with PRs #7–9, six additional
+milestone-table tasks are now done. Twelve of the 20 milestone-table tasks are
+done; eight remain open. AUTH-RECOVERY is also listed separately (it overlaps
+M1-01), followed by three later enhancements: 12 open named checklist entries.
+Email recovery still needs an owned verified sending domain. Manual/classmate
+QA, physical mobile testing, preview database separation, account deletion and
+backup/restore operations remain open; this does not close the whole MVP.
 
 ## Timer execution release
 
@@ -25,10 +76,10 @@ session with matching skip/stop events. The 375px execution timeline was visuall
 checked. Reopened timers intentionally remain paused and exclude closed-page
 time; see [timing and checkpoint limits](TIMER_EXECUTION.md).
 
-Four additional main tasks are now released across PRs #7–9: DB-03, M5-02,
-S4-02 and M4-02. Email recovery, mentor permissions and manual/operational
-acceptance remain open. The maintainer approved selected-session, revocable
-read-only mentor sharing as the next implementation on 2026-11-09.
+At this release, four additional main tasks were done across PRs #7–9: DB-03,
+M5-02, S4-02 and M4-02. Mentor permissions were subsequently released in
+PR #11, recorded above. Email recovery and manual/operational acceptance
+remain open.
 
 ## Backup, history and report release
 
@@ -60,9 +111,9 @@ could not read the first account's session (404), search its records, or include
 its effort in reports. There were no page errors or 375px page overflow. These
 checks used only synthetic accounts and did not edit existing students' data.
 
-Email recovery still requires an owned verified sender domain. M4 execution
-events, mentor permissions, manual/classmate QA and operational acceptance
-remain separate backlog items.
+Email recovery still requires an owned verified sender domain. The later timer
+and sharing release records above cover execution events and mentor access;
+manual/classmate QA and operational acceptance remain open.
 
 ## Original database release
 
@@ -110,9 +161,10 @@ The production run used synthetic QA accounts and did not edit existing users.
 
 ## Remaining acceptance
 
-RELEASE-01 and QA-02 remain in progress. Manual screen-reader/contrast review,
-three-classmate usability checks and physical-device testing are still open.
-Email verification/password reset, mentor permissions, preview database
-separation, account deletion and backup/restore operations remain on the
-working checklist. The broader deployment checklist must be repeated for future
-application releases; this record applies to the revision above.
+RELEASE-01 was subsequently verified with the sharing release above. QA-02
+remains in progress: manual screen-reader/contrast review, three-classmate
+usability checks and physical-device testing are still open. Email
+verification/password reset, preview database separation, account deletion
+and backup/restore operations remain on the working checklist. Repeat the
+broader deployment checklist for future application releases; each record
+here applies to its stated revision.
