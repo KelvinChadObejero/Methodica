@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { summarize } from "../src/lib/analytics";
 import { sessionsCsv } from "../src/lib/export";
 import type { SessionLog } from "../src/types";
+import { reportQuery, studyReport, inReport } from "../../backend/src/reporting";
 
 const now = new Date(2026, 9, 28, 12);
 function session(daysAgo: number, subject = "Biology"): SessionLog {
@@ -59,4 +60,48 @@ test("CSV preserves commas, quotes, line breaks, reflections and neutralizes for
   assert(csv.includes(`"'=HYPERLINK(""bad"")"`));
   assert(csv.includes('"A, B and ""C""\nNext line"'));
   assert(csv.includes('"4","2"'));
+});
+
+test("calendar reports include DST boundaries, partial effort and exactly the exported sessions", () => {
+  const query = reportQuery(
+    new URLSearchParams("days=7&timezone=America%2FLos_Angeles"),
+    new Date("2026-11-02T20:00:00Z")
+  );
+  const records = [
+    "2026-10-27T06:59:59Z",
+    "2026-10-27T07:00:00Z",
+    "2026-11-01T08:30:00Z",
+    "2026-11-01T09:30:00Z",
+    "2026-11-02T07:59:59Z",
+    "2026-11-03T07:00:00Z",
+  ].map((startedAt, i) => ({
+    ...session(i),
+    id: String(i),
+    startedAt,
+    focusMinutes: 0.5,
+    status: "stopped" as const,
+  }));
+  const report = studyReport(records, query);
+  assert.equal(query.startDay, "2026-10-27");
+  assert.equal(report.count, 4);
+  assert.equal(report.focusMinutes, 2);
+  assert.equal(report.completed, 0);
+  assert.equal(report.streak, 1);
+  assert.equal(report.daily.find((d) => d.key === "2026-11-01")!.minutes, 1.5);
+  assert.equal(
+    report.daily.reduce((sum, d) => sum + d.minutes, 0),
+    report.focusMinutes
+  );
+  assert.equal(records.filter((s) => inReport(s, query)).length, report.count);
+  assert.equal(
+    studyReport(
+      records,
+      reportQuery(
+        new URLSearchParams("days=30&timezone=America%2FLos_Angeles"),
+        new Date(query.until)
+      )
+    ).count,
+    5
+  );
+  assert.throws(() => reportQuery(new URLSearchParams("timezone=Unknown/Zone")), /timezone/);
 });

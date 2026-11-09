@@ -31,19 +31,29 @@ Public endpoints also include `GET /api/preview`, returning `{workspace, studyTy
 
 All errors are JSON `{message}`. Validation errors return 400; missing records 404; duplicate conflicts/library limits 409; oversized bodies 413; storage errors 500. On Vercel, workspace routes return 503 when account storage is unconfigured. Failed storage reads never reset existing data to seed data. Responses are not cached.
 
+History and reports use the bounded endpoints in [HISTORY_REPORTS.md](HISTORY_REPORTS.md):
+
+- `GET /api/workspace/overview`: library/templates and 25 recent sessions.
+- `GET /api/sessions/page`: server filters, counts, subjects and revision-guarded pagination.
+- `GET /api/sessions/:id`: one owner-scoped historical session.
+- `GET /api/reports/summary`: SQL aggregates and daily/subject series for 7/30/90 local calendar days.
+- `GET /api/reports/sessions`: CSV for the summary's timezone, cutoff and revision; changes return 409.
+
+Full workspace/session and CSV responses stream after successful reads. Normal startup does not fetch the full history.
+
 ## Flow validation
 
 Titles are trimmed, nonempty, at most 120 characters; subjects at most 60. A flow has 1–20 blocks, each with a title, one of `focus | break | review | recall`, and an integer duration of 1–120 minutes. Total duration cannot exceed 480 minutes. At least one block must be a study block. IDs and totals sent by a client are not trusted as computed values. Array order is execution order.
 
 ## Session semantics
 
-`POST /api/sessions` takes `id`, `flowId`, `flowTitle`, `flowTag`, `subject`, `startedAt`, `durationMinutes`, `focusMinutes`, and `status` (`completed | stopped`). The stable ID makes retrying an uncertain response safe. This endpoint accepts title/subject snapshots from the runner so an edit or deletion of its source flow cannot rewrite history. Account records use normalized study tables with an atomic compatibility mirror; see [DATA_MODEL.md](DATA_MODEL.md).
+`POST /api/sessions` takes `id`, `flowId`, `flowTitle`, `flowTag`, `subject`, `startedAt`, `durationMinutes`, `focusMinutes`, `status` (`completed | stopped`), and optional ordered `blocks`. The stable ID makes retrying an uncertain response safe. This endpoint accepts title/subject snapshots from the runner so an edit or deletion of its source flow cannot rewrite history. Account records use normalized study tables with an atomic compatibility mirror; see [DATA_MODEL.md](DATA_MODEL.md).
 
 Durations count actual running milliseconds, rounded down to whole seconds before submission. Paused time is excluded. Study time additionally excludes break blocks; skipped block time is never credited. An early finish or any skipped block is recorded as `stopped`, even if the remaining blocks finish. A session needs at least one second and cannot exceed 480 running minutes or its elapsed wall-clock time. The runner retains its own flow snapshot while running.
 
 The timer uses deadlines, advances over delayed ticks, and can pause before a break when auto-start is off. Its active run is retained in session storage in the current tab. It remains mounted across app navigation. Save failures retain the completed run and offer an explicit retry. This does not implement cross-tab locking, offline-first synchronization, or clock-tampering protection; those are follow-up work.
 
-Comprehension/fatigue are integers 1–5; notes are text up to 5000 characters. One reflection can be updated per session. The development adapter saves timestamps in ISO form. Dashboard date ranges and streaks use the browser's local calendar days and study time greater than zero; a streak can end today or yesterday. The weekly chart always shows the last seven days, independently of the summary range.
+Comprehension/fatigue are integers 1–5; notes are text up to 5000 characters. One reflection can be updated per session. The development adapter saves timestamps in ISO form. Dashboard date ranges and streaks use the browser's local calendar days and study time greater than zero; a streak can end today or yesterday. The chart and report CSV cover the same selected range and captured cutoff; the displayed timezone is sent explicitly to the API. See the calendar/export rules in HISTORY_REPORTS.md.
 
 ## Storage and migration
 

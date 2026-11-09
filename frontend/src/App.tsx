@@ -183,11 +183,11 @@ export default function App() {
         )}
         {data && (
           <>
-            {screen === "dashboard" && <Dashboard />}
+            {screen === "dashboard" && <Dashboard key={`${mode}-${user?.id}`} />}
             {screen === "builder" && <FlowBuilder key={`${mode}-${user?.id}`} />}
             {screen === "community" && <CommunityHub />}
             {screen === "reflect" && <Reflection key={`${mode}-${user?.id}`} />}
-            {screen === "history" && <SessionHistory />}
+            {screen === "history" && <SessionHistory key={`${mode}-${user?.id}`} />}
             <div hidden={screen !== "timer"}>
               <Timer key={`${mode}-${mode === "server" ? user?.id : "guest"}`} />
             </div>

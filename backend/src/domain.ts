@@ -50,6 +50,8 @@ export interface SessionLog {
   subject: string;
   status: "completed" | "stopped";
   timingSource?: "legacy-estimate";
+  // The planned blocks at session start; absent on older records.
+  blocks?: StudyBlock[];
   hasReflection: boolean;
   reflection?: ReflectionEntry;
 }

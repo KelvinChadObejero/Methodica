@@ -1,14 +1,64 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useWorkspace } from "../lib/useWorkspace";
 import { navigate } from "../lib/navigation";
-import { summarize } from "../lib/analytics";
-import { download, sessionsCsv } from "../lib/export";
-
+import type { StudyReport } from "../../../backend/src/reporting";
+import { errorMessage } from "../lib/api";
+import { download } from "../lib/export";
 export default function Dashboard() {
-  const { data } = useWorkspace();
+  const { data, getReport, exportReport } = useWorkspace();
   const [range, setRange] = useState(7);
-  const summary = summarize(data?.sessions || [], range);
-  const maximum = Math.max(...summary.daily.map((day) => day.minutes), 1);
+  const [summary, setSummary] = useState<StudyReport | null>(null);
+  const [error, setError] = useState("");
+  const [retry, setRetry] = useState(0);
+  const [exporting, setExporting] = useState(false);
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  useEffect(() => {
+    let cancelled = false;
+    setSummary(null);
+    setError("");
+    void getReport(range, timezone)
+      .then((result) => {
+        if (!cancelled) setSummary(result);
+      })
+      .catch((cause) => {
+        if (!cancelled) setError(errorMessage(cause));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [getReport, data, range, timezone, retry]);
+  async function exportCsv() {
+    if (!summary) return;
+    setExporting(true);
+    setError("");
+    try {
+      download(await exportReport(summary), "methodica-report.csv", "text/csv;charset=utf-8");
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      setExporting(false);
+    }
+  }
+  if (!summary)
+    return (
+      <section className="screen">
+        <h1 className="page-title">Your learning, in progress.</h1>
+        {error ? <p role="alert">{error}</p> : <p role="status">Loading your report…</p>}
+        <button className="btn ghost" onClick={() => setRetry((v) => v + 1)}>
+          Refresh report
+        </button>
+      </section>
+    );
+  const binSize = Math.ceil(range / 7);
+  const daily = Array.from({ length: Math.ceil(summary.daily.length / binSize) }, (_, i) => {
+    const days = summary.daily.slice(i * binSize, (i + 1) * binSize);
+    return {
+      key: days[0].key,
+      label: days.length === 1 ? days[0].label : `${days[0].label}–${days[days.length - 1].label}`,
+      minutes: days.reduce((sum, d) => sum + d.minutes, 0),
+    };
+  });
+  const maximum = Math.max(...daily.map((day) => day.minutes), 1);
   return (
     <section className="screen dashboard-screen">
       <div className="eyebrow">YOUR LEARNING, IN PROGRESS</div>
@@ -38,18 +88,24 @@ export default function Dashboard() {
         </div>
         <button
           className="btn ghost"
-          disabled={!summary.selected.length}
-          onClick={() =>
-            download(
-              sessionsCsv(summary.selected),
-              "methodica-report.csv",
-              "text/csv;charset=utf-8"
-            )
-          }
+          disabled={!summary.count || exporting}
+          onClick={() => void exportCsv()}
         >
-          Export report
+          {exporting ? "Exporting…" : "Export report"}
         </button>
       </div>
+      <p className="muted">
+        Calendar days in {summary.timezone}. Study time is credited to the day a session starts.
+        Partial study sessions count toward your streak.
+      </p>
+      {error && (
+        <p role="alert">
+          {error}{" "}
+          <button className="text-button" onClick={() => setRetry((v) => v + 1)}>
+            Refresh report
+          </button>
+        </p>
+      )}
       <div className="stat-grid">
         <div className="card stat-card">
           <div className="stat-label">Study time</div>
@@ -63,7 +119,7 @@ export default function Dashboard() {
         </div>
         <div className="card stat-card">
           <div className="stat-label">Sessions logged</div>
-          <div className="stat-value">{summary.selected.length}</div>
+          <div className="stat-value">{summary.count}</div>
           <div className="stat-sub">{summary.completed} completed in full</div>
         </div>
         <div className="card stat-card">
@@ -80,7 +136,7 @@ export default function Dashboard() {
           <div className="stat-sub">Learn a little about how you learn</div>
         </div>
       </div>
-      {!data?.sessions.length && (
+      {!summary.totalSessions && (
         <div className="card welcome-panel">
           <div>
             <span className="tag">A FRESH START</span>
@@ -97,17 +153,18 @@ export default function Dashboard() {
       <div className="dashboard-columns">
         <div className="card chart-panel">
           <div className="panel-heading">
-            <h2>A week of attention</h2>
-            <span className="muted">Study minutes · last 7 days</span>
+            <h2>Attention over time</h2>
+            <span className="muted">Study minutes · last {range} days</span>
           </div>
           <div
             className="weekly-bars"
+            style={{ gridTemplateColumns: `repeat(${daily.length}, minmax(0, 1fr))` }}
             role="img"
-            aria-label={summary.daily
+            aria-label={daily
               .map((day) => `${day.label}: ${day.minutes.toFixed(1)} study minutes`)
               .join(", ")}
           >
-            {summary.daily.map((day) => (
+            {daily.map((day) => (
               <div className="day-column" key={day.key}>
                 <span className="day-value">{Math.round(day.minutes)}</span>
                 <div className="bar-track">

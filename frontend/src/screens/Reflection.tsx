@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useWorkspace } from "../lib/useWorkspace";
 import { errorMessage } from "../lib/api";
 import { navigate } from "../lib/navigation";
@@ -12,7 +12,6 @@ import {
   type ReflectionDraft,
 } from "../lib/drafts";
 import { useUnsavedChanges } from "../lib/useUnsavedChanges";
-
 function selectedSessionId() {
   try {
     return sessionStorage.getItem("methodica-reflection-session") || "";
@@ -155,11 +154,37 @@ function ReflectionForm({ session }: { session: SessionLog }) {
     </form>
   );
 }
-
 export default function Reflection() {
-  const { data } = useWorkspace();
+  const { data, getSession } = useWorkspace();
   const [selectedId, setSelectedId] = useState(selectedSessionId);
-  const sessions = [...(data?.sessions || [])].sort(
+  const [older, setOlder] = useState<SessionLog | null>(null);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const cached = data?.sessions.find((item) => item.id === selectedId);
+  useEffect(() => {
+    let cancelled = false;
+    setOlder(null);
+    setError("");
+    if (!selectedId || cached) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    void getSession(selectedId)
+      .then((result) => {
+        if (!cancelled) setOlder(result);
+      })
+      .catch((cause) => {
+        if (!cancelled) setError(errorMessage(cause));
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedId, cached, getSession]);
+  const sessions = [...(older && !cached ? [older] : []), ...(data?.sessions || [])].sort(
     (a, b) => Date.parse(b.startedAt) - Date.parse(a.startedAt)
   );
   const session =
@@ -174,30 +199,48 @@ export default function Reflection() {
         Notice what helped you understand, and what took your energy. Carry that into your next
         session.
       </p>
-      {!session ? (
-        <div className="card empty-state">
-          <h2>Something to reflect on, soon.</h2>
-          <p>Run a study flow first. Your saved session will appear here.</p>
-          <button className="btn" onClick={() => navigate("timer")}>
-            Start a session
+      {loading && <p role="status">Loading your selected session…</p>}
+      {error && (
+        <p className="feedback" role="alert">
+          {error}{" "}
+          <button className="text-button" onClick={() => setSelectedId("")}>
+            Choose a recent session
           </button>
-        </div>
-      ) : (
-        <>
-          <label className="session-picker">
-            Choose a session
-            <select value={session.id} onChange={(event) => setSelectedId(event.target.value)}>
-              {sessions.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.flowTitle} · {new Date(item.startedAt).toLocaleString()}
-                  {item.hasReflection ? " · Reflected" : ""}
-                </option>
-              ))}
-            </select>
-          </label>
-          <ReflectionForm key={session.id} session={session} />
-        </>
+        </p>
       )}
+      {!loading &&
+        !error &&
+        (!session ? (
+          <div className="card empty-state">
+            <h2>Something to reflect on, soon.</h2>
+            <p>Run a study flow first. Your saved session will appear here.</p>
+            <button className="btn" onClick={() => navigate("timer")}>
+              Start a session
+            </button>
+          </div>
+        ) : (
+          <>
+            <label className="session-picker">
+              Choose a session
+              <select value={session.id} onChange={(event) => setSelectedId(event.target.value)}>
+                {sessions.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.flowTitle} · {new Date(item.startedAt).toLocaleString()}
+                    {item.hasReflection ? " · Reflected" : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <p className="muted">
+              Recent sessions are listed here.{" "}
+              <button className="text-button" onClick={() => navigate("history")}>
+                Browse all sessions
+              </button>{" "}
+              to reflect on an older one.
+            </p>
+            <ReflectionForm key={session.id} session={session} />
+          </>
+        ))}
     </section>
   );
 }

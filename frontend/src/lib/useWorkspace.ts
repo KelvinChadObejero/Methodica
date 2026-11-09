@@ -1,3 +1,5 @@
+import type { HistoryQuery, HistoryPage } from "../../../backend/src/history";
+import type { StudyReport } from "../../../backend/src/reporting";
 import { createContext, useContext } from "react";
 import type { ReflectionEntry, SessionLog, StudyFlow, StudyType, Workspace } from "../types";
 import type { ImportSummary } from "../../../backend/src/workspace-import";
@@ -8,6 +10,8 @@ export interface WorkspaceContextValue {
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  // Account sessions are a recent cache, not the full history. Use getHistory,
+  // getSession, getReport, or explicit getWorkspace for complete data.
   data: Workspace | null;
   mode: "server" | "device";
   studyTypes: StudyType[];
@@ -17,6 +21,10 @@ export interface WorkspaceContextValue {
   reload: () => Promise<void>;
   startDevice: () => Promise<void>;
   connectServer: () => Promise<void>;
+  getHistory: (query: HistoryQuery) => Promise<HistoryPage>;
+  getSession: (id: string) => Promise<SessionLog>;
+  getReport: (days: number, timezone: string) => Promise<StudyReport>;
+  exportReport: (report: StudyReport) => Promise<string>;
   getWorkspace: () => Promise<Workspace>;
   importDeviceWorkspace: (workspace: Workspace, reviewToken: string) => Promise<ImportSummary>;
   saveFlow: (flow: StudyFlow, isNew: boolean) => Promise<StudyFlow>;

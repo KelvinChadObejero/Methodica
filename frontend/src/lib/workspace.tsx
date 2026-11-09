@@ -1,3 +1,12 @@
+import { canonical } from "../../../backend/src/workspace-import";
+import { historyPage, type HistoryQuery, type HistoryPage } from "../../../backend/src/history";
+import {
+  reportQuery,
+  studyReport,
+  inReport,
+  type StudyReport,
+} from "../../../backend/src/reporting";
+import { sessionsCsv } from "./export";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import type {
   ReflectionEntry,
@@ -38,6 +47,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [accountsAvailable, setAccountsAvailable] = useState<boolean | null>(null);
   const generation = useRef(0);
+  const deviceReports = useRef(new WeakMap<StudyReport, string>());
   const scope = useRef(0);
   const identity = useRef<string | null>(null);
   const [mode, setMode] = useState<"server" | "device">(() => {
@@ -77,7 +87,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         const seed = new DeviceWorkspace(localStorage).read();
         setData(seed.workspace);
       } else if (session) {
-        const workspace = await api<Workspace>("/workspace");
+        const workspace = await api<Workspace>("/workspace/overview");
         if (request !== generation.current) return;
         setData(workspace);
       } else setData(null);
@@ -135,7 +145,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     try {
       const [session, workspace, techniques] = await Promise.all([
         api<{ user: User } | null>("/auth/get-session"),
-        api<Workspace>("/workspace"),
+        api<Workspace>("/workspace/overview"),
         api<StudyType[]>("/studytypes"),
       ]);
       if (!session) throw new Error("Log in to open your account workspace.");
@@ -252,6 +262,76 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       : api<Workspace>("/workspace");
   }
 
+  const getHistory = useCallback(
+    async (params: HistoryQuery): Promise<HistoryPage> => {
+      const request = scope.current;
+      const search = new URLSearchParams(
+        Object.entries(params)
+          .filter(([, v]) => v !== undefined)
+          .map(([k, v]) => [k, String(v)])
+      );
+      const result =
+        mode === "device"
+          ? historyPage(new DeviceWorkspace(localStorage).read().workspace.sessions, params)
+          : await api<HistoryPage>(`/sessions/page?${search}`);
+      checkScope(request);
+      return result;
+    },
+    [mode]
+  );
+
+  const getSession = useCallback(
+    async (id: string) => {
+      const request = scope.current;
+      const result =
+        mode === "device"
+          ? new DeviceWorkspace(localStorage).read().workspace.sessions.find((s) => s.id === id)
+          : await api<SessionLog>(`/sessions/${encodeURIComponent(id)}`);
+      checkScope(request);
+      if (!result) throw new Error("Session not found.");
+      return result;
+    },
+    [mode]
+  );
+
+  const getReport = useCallback(
+    async (days: number, timezone: string): Promise<StudyReport> => {
+      const request = scope.current;
+      const search = new URLSearchParams({ days: String(days), timezone });
+      let result: StudyReport;
+      if (mode === "device") {
+        const sessions = new DeviceWorkspace(localStorage).read().workspace.sessions;
+        result = studyReport(sessions, reportQuery(search));
+        deviceReports.current.set(result, canonical(sessions));
+      } else result = await api<StudyReport>(`/reports/summary?${search}`);
+      checkScope(request);
+      return result;
+    },
+    [mode]
+  );
+
+  const exportReport = useCallback(
+    async (report: StudyReport) => {
+      const request = scope.current;
+      const params = new URLSearchParams({
+        days: String(report.days),
+        timezone: report.timezone,
+        until: report.until,
+        revision: String(report.revision),
+      });
+      let result: { csv: string };
+      if (mode === "device") {
+        const sessions = new DeviceWorkspace(localStorage).read().workspace.sessions;
+        if (deviceReports.current.get(report) !== canonical(sessions))
+          throw new Error("Your sessions changed. Refresh the report before exporting.");
+        result = { csv: sessionsCsv(sessions.filter((s) => inReport(s, report))) };
+      } else result = await api<{ csv: string }>(`/reports/sessions?${params}`);
+      checkScope(request);
+      return result.csv;
+    },
+    [mode]
+  );
+
   function refreshDevice() {
     setData(new DeviceWorkspace(localStorage).read().workspace);
   }
@@ -329,7 +409,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       (prev) =>
         prev && {
           ...prev,
-          sessions: prev.sessions.map((session) => (session.id === id ? saved : session)),
+          sessions: [saved, ...prev.sessions.filter((session) => session.id !== id)],
         }
     );
   }
@@ -393,6 +473,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         saveFlow,
         deleteFlow,
         saveSession,
+        getHistory,
+        getSession,
+        getReport,
+        exportReport,
         saveReflection,
         importTemplate,
         publishFlow,

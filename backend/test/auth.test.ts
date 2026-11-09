@@ -1,3 +1,5 @@
+import { historyQuery } from "../src/history.js";
+import { reportQuery, studyReport } from "../src/reporting.js";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { once } from "node:events";
@@ -139,6 +141,7 @@ test(
         startedAt: new Date(Date.now() - 120000).toISOString(),
         durationMinutes: 1,
         focusMinutes: 1,
+        blocks: flow.body.blocks,
         status: "completed",
       };
       assert.equal((await request("/sessions", "POST", sessionInput, firstCookie)).status, 201);
@@ -152,6 +155,67 @@ test(
           .status,
         200
       );
+      const recorded = await request("/sessions/alice-session", "GET", undefined, firstCookie);
+      assert.deepEqual(recorded.body.blocks, flow.body.blocks);
+      assert.equal(
+        (await request("/sessions/page?q=%25", "GET", undefined, firstCookie)).body.total,
+        0
+      );
+      const history = await request(
+        "/sessions/page?q=PRIVATE&reflected=true&limit=1",
+        "GET",
+        undefined,
+        firstCookie
+      );
+      assert.equal(history.body.total, 1);
+      assert.equal(history.body.items[0].id, "alice-session");
+      assert.equal(
+        (await request("/sessions/page?limit=0", "GET", undefined, firstCookie)).status,
+        400
+      );
+      assert.equal(
+        (await request("/reports/summary?timezone=Not/AZone", "GET", undefined, firstCookie))
+          .status,
+        400
+      );
+      const report = await request(
+        "/reports/summary?days=7&timezone=Asia%2FTaipei",
+        "GET",
+        undefined,
+        firstCookie
+      );
+      assert.equal(report.status, 200, JSON.stringify(report.body));
+      assert.equal(report.body.focusMinutes, 1);
+      assert.equal(report.body.count, 1);
+      const reportParams = new URLSearchParams({
+        days: "7",
+        timezone: report.body.timezone,
+        until: report.body.until,
+        revision: String(report.body.revision),
+      });
+      const exported = await request(
+        `/reports/sessions?${reportParams}`,
+        "GET",
+        undefined,
+        firstCookie
+      );
+      assert(exported.body.csv.includes("Alice private notes"));
+      await request("/flows", "POST", flowInput, firstCookie);
+      assert.equal(
+        (
+          await request(
+            `/sessions/page?revision=${history.body.revision}`,
+            "GET",
+            undefined,
+            firstCookie
+          )
+        ).status,
+        409
+      );
+      assert.equal(
+        (await request(`/reports/sessions?${reportParams}`, "GET", undefined, firstCookie)).status,
+        409
+      );
       const bob = await request("/auth/sign-up/email", "POST", {
         name: "Bob",
         email: "bob@example.test",
@@ -159,6 +223,18 @@ test(
       });
       assert.equal(bob.status, 200, JSON.stringify(bob.body));
       const bobsCookie = bob.cookie;
+      assert.equal(
+        (await request("/sessions/alice-session", "GET", undefined, bobsCookie)).status,
+        404
+      );
+      assert.equal(
+        (await request("/sessions/page?q=Alice", "GET", undefined, bobsCookie)).body.total,
+        0
+      );
+      assert.equal(
+        (await request("/reports/summary", "GET", undefined, bobsCookie)).body.focusMinutes,
+        0
+      );
       const bobWorkspace = await request("/workspace", "GET", undefined, bobsCookie);
       assert(!JSON.stringify(bobWorkspace.body).includes("Alice"));
       for (const [path, method, body] of [
@@ -178,7 +254,7 @@ test(
       assert(results.every((result) => result.status === 201));
       assert.equal(
         (await request("/flows", "GET", undefined, firstCookie)).body.length,
-        workspace.body.flows.length + 3
+        workspace.body.flows.length + 4
       );
       assert.equal((await request("/auth/sign-out", "POST", {}, firstCookie)).status, 200);
       assert.equal((await request("/workspace", "GET", undefined, firstCookie)).status, 401);
@@ -425,6 +501,7 @@ test(
           notes: "Private notes\nwith a second line",
         },
       });
+      legacy.sessions[0].blocks = structuredClone(legacy.flows[0].blocks);
       // Simulate an account created by the JSON deployment before this migration.
       await db.workspace.create({ data: { userId, data: json(legacy) } });
       let store = new AccountWorkspace(db, userId);
@@ -485,6 +562,11 @@ test(
       rollback.sessions[0].reflection!.notes = "Saved by previous deployment";
       await db.workspace.update({ where: { userId }, data: { data: json(rollback) } });
       assert.deepEqual(await store.read(), rollback);
+      const oldClient = structuredClone(rollback);
+      delete oldClient.sessions[0].blocks;
+      await db.workspace.update({ where: { userId }, data: { data: json(oldClient) } });
+      assert.deepEqual((await store.read()).sessions[0].blocks, legacy.sessions[0].blocks);
+
       assert.equal(
         (
           await db.sessionLog.findUniqueOrThrow({
@@ -505,11 +587,84 @@ test(
       assert.equal((await store.read()).sessions.length, 4999);
       await store.update((data) => {
         data.sessions.unshift({ ...legacy.sessions[0], id: "newest-session" });
+        data.sessions = [
+          ...data.sessions.slice(0, 4000),
+          ...Array.from({ length: 1000 }, (_, i) => ({ ...legacy.sessions[0], id: `bulk-${i}` })),
+        ];
       });
       const full = await store.read();
       assert.equal(full.sessions.length, 5000);
       assert.equal(full.sessions[0].id, "newest-session");
-      assert.equal(full.sessions[4999].id, "legacy history 4998");
+      assert.equal(full.sessions[4999].id, "bulk-999");
+      assert.equal(full.sessions[4999].reflection!.notes, legacy.sessions[0].reflection!.notes);
+      const page1 = await store.history(historyQuery(new URLSearchParams("limit=25")));
+      const page2 = await store.history({
+        ...historyQuery(new URLSearchParams("limit=25&offset=25")),
+        revision: page1.revision,
+      });
+      assert.equal(page1.total, 5000);
+      assert.equal(page1.items.length, 25);
+      assert.equal(page2.items.length, 25);
+      assert(!page2.items.some((row) => page1.items.some((first) => first.id === row.id)));
+      assert.equal((await store.overview()).sessions.length, 25);
+      assert.equal(
+        (await store.session("newest-session"))!.blocks!.length,
+        legacy.sessions[0].blocks!.length
+      );
+      const query = reportQuery(
+        new URLSearchParams("days=30&timezone=Asia%2FTaipei"),
+        new Date("2026-10-28T08:00:00Z")
+      );
+      assert.deepEqual(
+        await store.report(query),
+        studyReport(full.sessions, query, page1.revision)
+      );
+      assert.equal((await store.reportSessions(query, page1.revision)).length, 5000);
+      await store.update((data) => {
+        data.sessions[0].reflection!.notes = "Changed after page one";
+      });
+      await assert.rejects(
+        store.history({ ...historyQuery(new URLSearchParams()), revision: page1.revision }),
+        /history changed/
+      );
+      // Same-millisecond old-writer updates invalidate the fast-read marker.
+      const marker = await db.workspace.findUniqueOrThrow({ where: { userId } });
+      await db.workspace.update({
+        where: { userId },
+        data: { data: json(rollback), updatedAt: marker.updatedAt },
+      });
+      assert.equal(
+        (await db.workspace.findUniqueOrThrow({ where: { userId } })).normalizedAt,
+        null
+      );
+      assert.equal((await store.history(historyQuery(new URLSearchParams()))).total, 1);
+      // DST boundary: local midnight and the repeated hour agree between SQL,
+      // the browser adapter, the chart totals and the export membership.
+      const dst = structuredClone(rollback);
+      dst.sessions = [
+        "2026-10-27T06:59:59Z",
+        "2026-10-27T07:00:00Z",
+        "2026-11-01T08:30:00Z",
+        "2026-11-01T09:30:00Z",
+        "2026-11-03T07:00:00Z",
+      ].map((startedAt, i) => ({
+        ...legacy.sessions[0],
+        id: `dst-${i}`,
+        startedAt: new Date(startedAt).toISOString(),
+        focusMinutes: i === 0 ? 0 : 1.5,
+        status: "stopped",
+      }));
+      await db.workspace.update({ where: { userId }, data: { data: json(dst) } });
+      const dstQuery = reportQuery(
+        new URLSearchParams("days=7&timezone=America%2FLos_Angeles"),
+        new Date("2026-11-02T20:00:00Z")
+      );
+      const dstPage = await store.history(historyQuery(new URLSearchParams()));
+      assert.deepEqual(
+        await store.report(dstQuery),
+        studyReport(dst.sessions, dstQuery, dstPage.revision)
+      );
+      assert.equal((await store.reportSessions(dstQuery, dstPage.revision)).length, 3);
       await db.workspace.update({ where: { userId }, data: { data: json(rollback) } });
       assert.deepEqual(await store.read(), rollback);
       const corrupt = { ...rollback, flows: [null] } as unknown as Workspace;

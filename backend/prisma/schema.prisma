@@ -89,6 +89,8 @@ model Workspace {
   data             Json
   updatedAt        DateTime @updatedAt
   normalizedDigest String?
+  normalizedAt     DateTime?
+  revision         Int      @default(0)
 }
 
 enum FlowKind {
@@ -170,6 +172,7 @@ model StudySession {
   subject         String
   status          StudySessionStatus
   timingSource    String?
+  blocks          Json?
   log             SessionLog?
 
   @@id([userId, id])
