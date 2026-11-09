@@ -1,4 +1,12 @@
 let accountId: string | null = null;
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public status: number
+  ) {
+    super(message);
+  }
+}
 export function setAccountScope(id: string | null) {
   accountId = id;
 }
@@ -23,13 +31,14 @@ export async function api<T>(path: string, method = "GET", body?: unknown): Prom
     if (response.status === 401 && !path.startsWith("/auth/"))
       window.dispatchEvent(new Event("methodica-session-expired"));
     const error = await response.json().catch(() => null);
-    throw new Error(
+    throw new ApiError(
       response.status === 503
         ? "The online workspace is not available yet. You can study on this device while online storage is being configured."
         : error?.message ||
             (response.status >= 500
               ? "The study service is temporarily unavailable. Please try again."
-              : `Request failed (${response.status}).`)
+              : `Request failed (${response.status}).`),
+      response.status
     );
   }
   if (response.status === 204) return undefined as T;

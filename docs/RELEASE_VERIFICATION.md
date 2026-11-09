@@ -1,5 +1,41 @@
 # Private workspace release — 2026-11-09
 
+## Backup, history and report release
+
+[PR #7](https://github.com/KelvinChadObejero/Methodica/pull/7) and
+[PR #8](https://github.com/KelvinChadObejero/Methodica/pull/8) complete DB-03,
+M5-02 and S4-02. PR #8's reviewed head
+`ac844c20b61178acb9b353ece8d86ade7e81bb05` passed all frontend, PostgreSQL 17
+and browser CI checks. Its squash merge
+`dbb3e5508285370782798a71cba9a7fbcb84656e` is the recorded source of READY
+production deployment `dpl_5ZLu5QLrQmXZqEBwKGyQ8kcD2UXR`, aliased to
+[Methodica](https://methodica-azure.vercel.app).
+
+Local checks passed 19 frontend tests, 12 API/database tests and four Chromium
+journeys, including a real two-minute run, 5,000 stored sessions, 1,000 batched
+new sessions, DST, rollback compatibility, older-page reflections, stale exports,
+and CSV counts/minutes matching the selected report. The 375px layout was
+visually checked without horizontal overflow.
+
+The exact hosted PR #8 preview passed a separate Chromium check: four reviewed
+100-session backup imports, a 25-row overview, paging and an older reflection,
+and a 30-day report containing 400 sessions / 200 measured study minutes. The
+workspace response was 6,203,485 bytes and CSV 6,050,774 bytes, confirming actual
+hosted streaming beyond the buffered response cap. No page errors occurred.
+
+A separate production Chromium check registered a synthetic account, imported
+30 sessions, loaded page two and its reflection, and downloaded a matching
+30-day CSV (30 sessions / 15 measured minutes, Asia/Taipei). A second account
+could not read the first account's session (404), search its records, or include
+its effort in reports. There were no page errors or 375px page overflow. These
+checks used only synthetic accounts and did not edit existing students' data.
+
+Email recovery still requires an owned verified sender domain. M4 execution
+events, mentor permissions, manual/classmate QA and operational acceptance
+remain separate backlog items.
+
+## Original database release
+
 [PR #5](https://github.com/KelvinChadObejero/Methodica/pull/5) was reviewed and
 squash-merged with maintainer authorization. Application release
 `2e7a0332318434f8f0167e2b79db8761fe83f129` deployed successfully to

@@ -12,6 +12,7 @@ import { accountServices, type AccountServices } from "./auth.js";
 import { AccountWorkspace, type WorkspaceStore } from "./database.js";
 import {
   validateStudyBlocks,
+  validateExecution,
   canonical,
   MAX_IMPORT_BYTES,
   hasImportAdditions,
@@ -355,6 +356,10 @@ export function createApp(options: { dataFile?: string; accounts?: AccountServic
       const flowTag = text(input.flowTag, "Flow subject", 60);
       const subject = text(input.subject, "Subject", 60);
       const blocks = input.blocks === undefined ? undefined : validateStudyBlocks(input.blocks);
+      const execution =
+        input.execution === undefined
+          ? undefined
+          : validateExecution(input.execution, blocks, durationMinutes, focusMinutes, input.status);
       let created = false;
       const session = await storeFor(res).update((data) => {
         const existing = data.sessions.find((item) => item.id === id);
@@ -363,6 +368,9 @@ export function createApp(options: { dataFile?: string; accounts?: AccountServic
             (blocks !== undefined &&
               existing.blocks !== undefined &&
               canonical(blocks) !== canonical(existing.blocks)) ||
+            (execution !== undefined &&
+              existing.execution !== undefined &&
+              canonical(execution) !== canonical(existing.execution)) ||
             existing.flowId !== flowId ||
             existing.startedAt !== new Date(started).toISOString() ||
             existing.durationMinutes !== durationMinutes ||
@@ -391,6 +399,7 @@ export function createApp(options: { dataFile?: string; accounts?: AccountServic
           focusMinutes,
           status: input.status as SessionLog["status"],
           ...(blocks ? { blocks } : {}),
+          ...(execution ? { execution } : {}),
           hasReflection: false,
         };
         data.sessions.unshift(entry);

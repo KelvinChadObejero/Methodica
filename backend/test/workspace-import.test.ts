@@ -103,6 +103,41 @@ test("legacy estimates retain provenance and cannot inflate measured study time"
   );
 });
 
+test("execution imports preserve measured outcomes and reject forged timelines", () => {
+  const source = device();
+  const blocks = [
+    { id: "historical-recall", title: "Old recall", type: "recall" as const, durationMinutes: 1 },
+  ];
+  const execution = {
+    version: 1 as const,
+    blocks: [{ blockId: blocks[0].id, elapsedMs: 60000, outcome: "completed" as const }],
+    events: [
+      { blockId: blocks[0].id, type: "started" as const, atMs: 0 },
+      { blockId: blocks[0].id, type: "completed" as const, atMs: 60000 },
+    ],
+  };
+  source.sessions[0] = { ...source.sessions[0], blocks, execution, status: "completed" };
+  const imported = validateImportWorkspace(source);
+  assert.deepEqual(imported.sessions[0].execution, execution);
+  for (const invalid of [
+    { ...execution, events: [] },
+    { ...execution, blocks: [{ ...execution.blocks[0], outcome: "running" }] },
+    { ...execution, blocks: [{ ...execution.blocks[0], elapsedMs: 60001 }] },
+    { ...execution, blocks: [{ ...execution.blocks[0], blockId: "another-owner-block" }] },
+  ])
+    assert.throws(() =>
+      validateImportWorkspace({
+        ...source,
+        sessions: [{ ...source.sessions[0], execution: invalid }],
+      })
+    );
+  const retry = planWorkspaceImport(
+    planWorkspaceImport(initialWorkspace(), imported).merged,
+    imported
+  );
+  assert.equal(retry.summary.added.sessions, 0);
+});
+
 test("conflicting IDs keep account versions, including newer reflection notes", () => {
   const source = validateImportWorkspace(device());
   const target = structuredClone(source);

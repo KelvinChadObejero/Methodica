@@ -39,6 +39,21 @@ export interface ReflectionEntry {
   notes: string;
 }
 
+export interface BlockExecution {
+  blockId: string;
+  elapsedMs: number;
+  outcome: "not-started" | "running" | "completed" | "skipped" | "stopped";
+}
+export interface SessionExecution {
+  version: 1;
+  blocks: BlockExecution[];
+  events: {
+    blockId: string;
+    type: "started" | "completed" | "skipped" | "stopped";
+    atMs: number;
+  }[];
+}
+
 export interface SessionLog {
   id: string;
   flowId: string;
@@ -52,6 +67,7 @@ export interface SessionLog {
   timingSource?: "legacy-estimate";
   // The planned blocks at session start; absent on older records.
   blocks?: StudyBlock[];
+  execution?: SessionExecution;
   hasReflection: boolean;
   reflection?: ReflectionEntry;
 }
