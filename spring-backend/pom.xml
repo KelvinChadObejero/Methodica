@@ -4,7 +4,7 @@
   <parent>
     <groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-parent</artifactId><version>3.5.7</version><relativePath/>
   </parent>
-  <groupId>com.methodica</groupId><artifactId>study-flow-api</artifactId><version>0.0.1-SNAPSHOT</version>
+  <groupId>com.it342g02.methodica</groupId><artifactId>methodica</artifactId><version>0.0.1-SNAPSHOT</version>
   <name>study-flow-api</name><description>Methodica Study Flow CRUD assignment</description>
   <properties><java.version>17</java.version></properties>
   <dependencies>

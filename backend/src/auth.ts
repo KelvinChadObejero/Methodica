@@ -2,6 +2,7 @@ import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import type { PrismaClient } from "./generated/prisma/client.js";
 import { createDatabase } from "./database.js";
+import { runtimeDatabaseUrl } from "./database-url.js";
 
 export function createAuthentication(db: PrismaClient, secret: string, origins: string[]) {
   if (secret.length < 32)
@@ -52,7 +53,8 @@ export async function closeAccountServices() {
 }
 
 export function accountServices(): AccountServices | null {
-  if (!process.env.DATABASE_URL || !process.env.BETTER_AUTH_SECRET) return null;
+  const databaseUrl = runtimeDatabaseUrl(process.env);
+  if (!databaseUrl || !process.env.BETTER_AUTH_SECRET) return null;
   if (!services) {
     const origins = process.env.VERCEL
       ? [
@@ -61,10 +63,7 @@ export function accountServices(): AccountServices | null {
           process.env.VERCEL_BRANCH_URL && `https://${process.env.VERCEL_BRANCH_URL}`,
         ].filter((value): value is string => Boolean(value))
       : [process.env.BETTER_AUTH_URL || "http://localhost:5173"];
-    const db = createDatabase(
-      process.env.DATABASE_URL,
-      process.env.LOCAL_PRISMA_DEV === "true" ? 1 : 3
-    );
+    const db = createDatabase(databaseUrl, process.env.LOCAL_PRISMA_DEV === "true" ? 1 : 3);
     services = {
       db,
       auth: createAuthentication(db, process.env.BETTER_AUTH_SECRET, origins),

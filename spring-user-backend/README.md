@@ -1,5 +1,7 @@
 # User Spring Boot CRUD
 
+The classroom Maven group is `com.it342g02.methodica` (IT342 G02, Methodica). This standalone User exercise retains the artifact ID `user-api`.
+
 For the website-based classroom demo on separate workstations, see [CLASSROOM-DEMO.md](../CLASSROOM-DEMO.md).
 
 This independent classroom project implements User, StudySession, and SessionLog from Methodica's ERD. A user owns sessions; each session keeps historical flow labels and has at most one reflection. The database generates user IDs, the timer supplies stable session IDs, and the server derives reflection labels from session data. It follows the assignment's four packages:

@@ -10,6 +10,10 @@ Released: **DB-01, DB-02, WEB-01, M2-02, M3-02 and S3-02** are done in [PR #5](h
 
 The proposal v2 specifies React + TypeScript on web, React Native + Expo on mobile, and Node.js + Express + TypeScript with PostgreSQL and Prisma. Sections 7.2–7.3 and 13.2 establish the backend direction, with a caveat for instructor requirements. Keep the two Spring Boot projects as separate classroom assignments. Do not connect the website to two production APIs.
 
+## Increment 1 classroom work
+
+Kelvin: StudyFlow, StudyType and StudyBlock CRUD in the standalone Spring classroom backend; see [demo requests and metadata](spring-backend/README.md). The website and classroom databases remain separate. The new StudyType/StudyBlock endpoints are demonstrated with an HTTP client.
+
 ## How we use this
 
 Use **To do → In progress → In review → Done**, with **Blocked** only for a named dependency. One owner implements; the other reviews. Pick two or three tasks each week and finish them before expanding the sprint. Keep one feature branch per task or coherent group. Add the task ID, test evidence, and a short demo path to each PR. A checked local implementation below still needs partner review and merge.
@@ -98,3 +102,11 @@ History/report implementation and acceptance evidence: [HISTORY_REPORTS.md](docs
 - [ ] Loading, empty, validation and API-failure states are usable; success is shown only after a successful save.
 - [ ] Keyboard/mobile checks completed for changed screens; cross-account tests completed for private endpoints.
 - [ ] Other teammate reviewed; docs/API contracts updated; PR merged. Add its link beside the task.
+
+Classroom verification (2026-11-10): Spring integration tests cover the three assigned entities and a temporary file-backed database survives application restarts and deletion. The StudyFlow `userId` remains unenforced while Andrei's separate User exercise is on hold. StudyType and StudyBlock are demonstrated through HTTP clients; the website demo screen does not yet cover them. See [the classroom API guide](spring-backend/README.md).
+
+OPS-01 inspection (2026-11-10): Vercel environment metadata shows the same integration-backed database variables targeted to both preview and production; separate preview storage and recovery evidence remain open. A safe isolation and recovery rehearsal plan is in [the deployment guide](docs/DEPLOYMENT.md).
+
+Classroom CI (2026-11-10): workflow now runs Maven tests for both Spring exercises using Java 17. Both suites pass locally with Java 18; the hosted workflow still needs to run on a pushed branch. The corrected announcement group is `com.it342g02.methodica`.
+
+OPS-01 progress: a new empty Neon resource is connected to Preview under `PREVIEW_` variables. Local code selects these variables and checks both preview connections against the original production connection before migrations. The code and isolation have not been deployed or verified end to end; existing deployments are unaffected, and restore remains incomplete.

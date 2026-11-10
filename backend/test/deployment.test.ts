@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import {
   mkdtempSync,
@@ -13,6 +13,7 @@ import {
 import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
+import { runtimeDatabaseUrl } from "../src/database-url.js";
 
 test("the configured Vercel entry point runs in native Node without a TS loader", () => {
   const entry = new URL("../index.cjs", import.meta.url).href;
@@ -80,5 +81,78 @@ test("the deployed bundle still starts when collected under a CommonJS package s
   } finally {
     assert(resolve(directory).startsWith(resolve(tmpdir()) + sep + "methodica-vercel-runtime-"));
     rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("hosted preview migrations require distinct matching preview database URLs", () => {
+  const guard = fileURLToPath(new URL("../scripts/check-preview-isolation.mjs", import.meta.url));
+  const run = (env: Record<string, string>) =>
+    spawnSync(process.execPath, [guard], { env, encoding: "utf8" });
+  const base = {
+    VERCEL: "1",
+    VERCEL_ENV: "preview",
+    DATABASE_URL: "postgresql://user:pass@prod-pooler.example/db",
+    PREVIEW_DATABASE_URL: "postgresql://user:pass@preview-pooler.example/db",
+    PREVIEW_DATABASE_URL_UNPOOLED: "postgresql://user:pass@preview.example/db",
+  };
+  assert.equal(run(base).status, 0);
+  assert.equal(run({ ...base, PREVIEW_DATABASE_URL: base.DATABASE_URL }).status, 1);
+  assert.equal(
+    run({ ...base, PREVIEW_DATABASE_URL_UNPOOLED: "postgresql://user:pass@other.example/db" })
+      .status,
+    1
+  );
+  assert.equal(run({ VERCEL: "1", VERCEL_ENV: "preview" }).status, 1);
+  assert.equal(run({ VERCEL: "1" }).status, 1);
+  assert.equal(run({ VERCEL: "1", VERCEL_ENV: "production" }).status, 0);
+  assert.equal(run({}).status, 0);
+  const config = JSON.parse(readFileSync(new URL("../../vercel.json", import.meta.url), "utf8"));
+  assert.match(
+    config.services.backend.buildCommand,
+    /^node scripts\/check-preview-isolation\.mjs && npm run db:migrate/
+  );
+});
+
+test("preview runtime never falls back to production storage", () => {
+  assert.equal(
+    runtimeDatabaseUrl({ VERCEL: "1", VERCEL_ENV: "preview", DATABASE_URL: "prod" }),
+    undefined
+  );
+  assert.equal(
+    runtimeDatabaseUrl({
+      VERCEL: "1",
+      VERCEL_ENV: "preview",
+      DATABASE_URL: "prod",
+      PREVIEW_DATABASE_URL: "preview",
+    }),
+    "preview"
+  );
+  assert.equal(
+    runtimeDatabaseUrl({
+      VERCEL: "1",
+      VERCEL_ENV: "production",
+      DATABASE_URL: "prod",
+      PREVIEW_DATABASE_URL: "preview",
+    }),
+    "prod"
+  );
+  assert.equal(runtimeDatabaseUrl({ DATABASE_URL: "local" }), "local");
+});
+
+test("hosted preview migrations select only the isolated unpooled URL", async () => {
+  const prior = { ...process.env };
+  try {
+    process.env.VERCEL = "1";
+    process.env.VERCEL_ENV = "preview";
+    process.env.DATABASE_URL = "postgresql://production.example/db";
+    process.env.DATABASE_URL_UNPOOLED = "postgresql://production.example/db";
+    process.env.PREVIEW_DATABASE_URL_UNPOOLED = "postgresql://preview.example/db";
+    const config = (await import("../prisma.config.js")).default;
+    assert.equal(config.datasource?.url, process.env.PREVIEW_DATABASE_URL_UNPOOLED);
+  } finally {
+    for (const key of ["VERCEL", "VERCEL_ENV", "DATABASE_URL", "DATABASE_URL_UNPOOLED", "PREVIEW_DATABASE_URL_UNPOOLED"]) {
+      if (prior[key] === undefined) delete process.env[key];
+      else process.env[key] = prior[key];
+    }
   }
 });
