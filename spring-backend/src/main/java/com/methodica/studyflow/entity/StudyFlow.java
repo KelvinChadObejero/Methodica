@@ -12,9 +12,12 @@ public class StudyFlow {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long flowId;
 
-    // The User entity is outside this assignment. This is not yet a foreign key.
-    @Column(nullable = false)
+    @Column(name = "user_id", nullable = false)
     private Long userId;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "user_id", nullable = false, insertable = false, updatable = false)
+    private User user;
 
     @Column(nullable = false, length = 200)
     private String title;

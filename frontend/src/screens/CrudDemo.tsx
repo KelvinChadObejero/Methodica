@@ -6,11 +6,11 @@ type Row = { flowId?: number; userId: number; title?: string; description?: stri
 
 const endpoints: Record<Kind, string> = {
   flows: "http://127.0.0.1:8080/api/flows",
-  users: "http://127.0.0.1:8081/api/users",
+  users: "http://127.0.0.1:8080/api/users",
 };
 
 export default function CrudDemo() {
-  const [kind, setKind] = useState<Kind>("flows");
+  const [kind, setKind] = useState<Kind>("users");
   const [rows, setRows] = useState<Row[]>([]);
   const [editId, setEditId] = useState<number | null>(null);
   const [flow, setFlow] = useState({ userId: "1", title: "", description: "", isPublic: false });
@@ -77,7 +77,7 @@ export default function CrudDemo() {
   return <div className="crud-demo">
     <header><p className="crud-eyebrow">CLASSROOM DEMO</p><h1>Explore the backend</h1>
       <p>Create, view, update and delete sample records using your Spring Boot assignments.</p></header>
-    <div className="crud-notice"><strong>Connect your workstation</strong><p>Start the Study Flow or User Spring Boot application on this computer, then load its records. The applications store separate demo data locally. Use sample details only.</p></div>
+    <div className="crud-notice"><strong>Connect your workstation</strong><p>Start spring-backend on this computer. Create a sample user first, then use their returned User ID when creating a flow. Both tabs use the same local database. Delete a user's flows before deleting the user.</p></div>
     <div className="crud-tabs" aria-label="Choose an entity">
       <button type="button" className={kind === "flows" ? "selected" : ""} onClick={() => selectKind("flows")}>Study flows</button>
       <button type="button" className={kind === "users" ? "selected" : ""} onClick={() => selectKind("users")}>Users</button>

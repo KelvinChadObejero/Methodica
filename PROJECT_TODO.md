@@ -10,6 +10,10 @@ Released: **DB-01, DB-02, WEB-01, M2-02, M3-02 and S3-02** are done in [PR #5](h
 
 The proposal v2 specifies React + TypeScript on web, React Native + Expo on mobile, and Node.js + Express + TypeScript with PostgreSQL and Prisma. Sections 7.2–7.3 and 13.2 establish the backend direction, with a caveat for instructor requirements. Keep the two Spring Boot projects as separate classroom assignments. Do not connect the website to two production APIs.
 
+## Increment 1 classroom work — November 11
+
+- **INC1-CRUD · Implemented / both review:** integrated all six entities in `spring-backend`, reusing Andrei's user/session work and the laboratory branch's type/block CRUD. The backend passes `mvn verify` (11 tests, including database rejection of orphan references and all-six-entity restart persistence); the live HTTP demo passes 44 checks. All ERD foreign keys, session end times, log IDs and log timestamps are implemented. Intentional `com.methodica` Maven metadata and older exercise databases are preserved. The website's user/flow tabs use the same classroom service. Frontend lint/build pass. See [the runbook](docs/INCREMENT_1_HANDOFF.md).
+
 ## How we use this
 
 Use **To do → In progress → In review → Done**, with **Blocked** only for a named dependency. One owner implements; the other reviews. Pick two or three tasks each week and finish them before expanding the sprint. Keep one feature branch per task or coherent group. Add the task ID, test evidence, and a short demo path to each PR. A checked local implementation below still needs partner review and merge.

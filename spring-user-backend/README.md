@@ -1,5 +1,7 @@
 # User Spring Boot CRUD
 
+This is the retained standalone individual exercise. For the November 11 Increment 1 check, use the integrated six-entity application in `spring-backend` instead; see [the runbook](../docs/INCREMENT_1_HANDOFF.md). Its records are separate from this exercise's database.
+
 For the website-based classroom demo on separate workstations, see [CLASSROOM-DEMO.md](../CLASSROOM-DEMO.md).
 
 This independent classroom project implements User, StudySession, and SessionLog from Methodica's ERD. A user owns sessions; each session keeps historical flow labels and has at most one reflection. The database generates user IDs, the timer supplies stable session IDs, and the server derives reflection labels from session data. It follows the assignment's four packages:
