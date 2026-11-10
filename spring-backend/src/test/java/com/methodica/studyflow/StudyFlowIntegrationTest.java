@@ -6,6 +6,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
+import com.methodica.studyflow.entity.*;
+import com.methodica.studyflow.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -19,6 +21,13 @@ import org.springframework.test.web.servlet.MockMvc;
 class StudyFlowIntegrationTest {
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper mapper;
+
+    @Autowired UserRepository users;
+    private Long ownerId;
+    @org.junit.jupiter.api.BeforeEach void createOwner() {
+        ownerId = users.save(new User("Owner", java.util.UUID.randomUUID() + "@example.com", "hash", Role.STUDENT)).getUserId();
+    }
+    private String owned(String json) { return json.replace("\"userId\":1", "\"userId\":" + ownerId); }
 
     @Test
     void allowsOnlyConfiguredOriginForBrowserDemo() throws Exception {
@@ -37,6 +46,7 @@ class StudyFlowIntegrationTest {
         String body = """
             {"userId":1,"title":"Recall","description":"Review","isPublic":false}
             """;
+        body = owned(body);
         String created = mvc.perform(post("/api/flows").contentType(MediaType.APPLICATION_JSON).content(body))
             .andExpect(status().isCreated()).andExpect(jsonPath("$.isPublic").value(false))
             .andExpect(jsonPath("$.createdAt").exists()).andReturn().getResponse().getContentAsString();
@@ -45,11 +55,11 @@ class StudyFlowIntegrationTest {
         mvc.perform(get("/api/flows")).andExpect(status().isOk()).andExpect(jsonPath("$[0].flowId").value(id));
         mvc.perform(get("/api/flows/{id}", id)).andExpect(status().isOk()).andExpect(jsonPath("$.title").value("Recall"));
         mvc.perform(put("/api/flows/{id}", id).contentType(MediaType.APPLICATION_JSON)
-            .content("{\"userId\":1,\"title\":\"Updated\",\"isPublic\":true}"))
+            .content(owned("{\"userId\":1,\"title\":\"Updated\",\"isPublic\":true}")))
             .andExpect(status().isOk()).andExpect(jsonPath("$.title").value("Updated"))
             .andExpect(jsonPath("$.createdAt").value(flow.get("createdAt").asText()));
         mvc.perform(post("/api/flows").contentType(MediaType.APPLICATION_JSON)
-            .content("{\"userId\":1,\"title\":\" \",\"isPublic\":false}"))
+            .content(owned("{\"userId\":1,\"title\":\" \",\"isPublic\":false}")))
             .andExpect(status().isBadRequest());
         mvc.perform(delete("/api/flows/{id}", id)).andExpect(status().isNoContent());
         mvc.perform(get("/api/flows/{id}", id)).andExpect(status().isNotFound());

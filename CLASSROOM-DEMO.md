@@ -1,14 +1,12 @@
-# Testing the assignments on separate workstations
+# Classroom backend demo
 
-The Methodica site has a Classroom CRUD Demo screen. It connects from each student's browser to Spring Boot running on that same computer. The website does not host the Spring applications. The website's Express API now provides a separate local development workspace; the classroom exercises do not share that data. Each student's H2 database stays on their own computer; user IDs in the Study Flow exercise are not linked to the separate User database.
+For Increment 1 on November 11, use [the six-entity runbook](docs/INCREMENT_1_HANDOFF.md). Start **only `spring-backend`**; it contains all six core entities and their relationships in one local database.
 
-The website changes and both Spring projects must first be committed to the GitHub repository and deployed to Vercel. These files alone do not update the live site. Then each student should pull or download that version of the repository on their own workstation. Install a supported JDK (Java 17 or 21 recommended). The included Maven wrapper downloads Maven and project dependencies the first time, so internet access is required.
+## Website User and StudyFlow screen
 
-## Start your own service
+The website's **CRUD Demo** screen uses `http://127.0.0.1:8080` for both tabs. Each student's browser connects to Spring Boot running on that same computer. The website does not host Spring or share these local records between workstations.
 
-Open PowerShell in the project folder. The commands below allow your deployed site, https://methodica-azure.vercel.app, to connect to the local service. Open that same address in the browser after starting the server; leave the service running only during the demo. If you use a different preview or custom domain, replace the address with the exact browser origin, including `https://` and without a trailing slash or path.
-
-For the Study Flow assignment:
+For the deployed site, start Spring from PowerShell:
 
 ```powershell
 cd spring-backend
@@ -16,24 +14,16 @@ $env:DEMO_ALLOWED_ORIGIN = 'https://methodica-azure.vercel.app'
 .\mvnw.cmd spring-boot:run
 ```
 
-For the User assignment, on your partner's computer:
+For a different preview/custom domain, use its exact trusted browser origin, including `https://` and excluding paths/trailing slashes. For the local Vite frontend at `http://localhost:5173`, omit the environment variable; that origin is the default. Restart Spring after changing the origin.
 
-```powershell
-cd spring-user-backend
-$env:DEMO_ALLOWED_ORIGIN = 'https://methodica-azure.vercel.app'
-.\mvnw.cmd spring-boot:run
-```
+1. Wait for `Started StudyFlowApplication`, then open the matching website and choose **CRUD Demo**.
+2. On **Users**, create a sample user and note the returned ID.
+3. Switch to **Study flows**, use that ID, and create a flow. Unknown user IDs return 404.
+4. Edit and save each record. Delete the flow before its user; a referenced user returns 409.
+5. Restart Spring and load records to demonstrate persistence. Stop it with Ctrl+C when finished.
 
-Wait for `Started StudyFlowApplication` or `Started UserApplication`. If Java is not found, install a JDK and set `JAVA_HOME` to its folder. For a local frontend started using Vite on `http://localhost:5173`, omit the environment variable; that origin is the default. If a different local port is used, set the variable to that exact origin instead.
+The deployed website must include the updated common API address from this PR. A locally running frontend from this checkout already uses it. For StudyType, StudyBlock, StudySession, and SessionLog, use Postman or `scripts/demo-increment-one.ps1` as documented in the runbook.
 
-## Demonstrate
+If connection fails, confirm Spring is running, `DEMO_ALLOWED_ORIGIN` matches the browser origin, and the browser permits local network access. Workstation/browser policies may require using the frontend locally or demonstrating with Postman instead.
 
-1. On that same computer, open the matching website URL and choose **CRUD Demo** in the sidebar.
-2. Select **Study flows** or **Users**, as appropriate, and click **Load records**. Only the matching Spring application needs to run.
-3. Fill the form with sample data and click **Create record**. The list refreshes from the Spring application.
-4. Select **Edit**, change a value and save. Then select **Delete** and confirm. Reload records to demonstrate persistence and deletion.
-5. Press Ctrl+C in the service terminal when finished. Each student's saved data belongs to that computer, and is not shared automatically.
-
-If the page cannot connect, confirm the service is running, the correct entity tab is selected, and `DEMO_ALLOWED_ORIGIN` exactly matches the address bar. Restart the service after changing it. Some browser or workstation policies may block a public website from accessing a local service; if so, run the frontend locally on the same computer, or use Postman as documented in the individual project README.
-
-The services bind to `127.0.0.1` only and have no login or access control. The configured origin is allowed to issue CRUD requests to the local service while it is running. Use sample data, use only a website origin you trust, and never expose the services publicly as-is.
+The service binds to `127.0.0.1` and has no login/access control. Use sample data and a trusted website origin. The original `spring-user-backend` remains an independent earlier exercise on port 8081; it is not needed for the integrated Increment 1 demo and uses its own records.

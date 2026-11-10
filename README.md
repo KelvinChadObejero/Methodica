@@ -45,7 +45,7 @@ PostgreSQL and Prisma persist accounts and normalized study tables with enforced
 
 Vercel applies migrations, then builds a small CommonJS bridge and self-contained ESM server bundle. Native Node checks exercise the collected package scope and authenticated database requests. See [DEPLOYMENT.md](docs/DEPLOYMENT.md) and [backend setup](backend/README.md).
 
-The Spring Boot projects remain independent classroom exercises with separate local H2 databases. See [CLASSROOM-DEMO.md](CLASSROOM-DEMO.md); they are not the website's production API.
+The integrated Spring Boot classroom backend provides CRUD and database relationships for all six core entities in one local H2 database. See the [Increment 1 runbook](docs/INCREMENT_1_HANDOFF.md) for setup, API coverage, and verification; the website's flow/user screen is documented in [CLASSROOM-DEMO.md](CLASSROOM-DEMO.md). Spring is separate from the website's production API; the original standalone User exercise is retained for reference.
 
 ## Collaboration
 
@@ -72,8 +72,8 @@ GitHub Actions runs those checks for both packages. API tests use a temporary fi
 ```text
 frontend/             React website, styles, shared UI logic and timer tests
 backend/              Express API, accounts, Prisma migrations and integration tests
-spring-backend/       Separate classroom Study Flow CRUD assignment
-spring-user-backend/  Separate classroom User CRUD assignment
+spring-backend/       Integrated six-entity classroom CRUD backend
+spring-user-backend/  Retained standalone User/session classroom exercise
 docs/API.md           API routes, data semantics and storage limits
 PROJECT_TODO.md       Two-person project backlog
 DESIGN.md             Focused Indigo design tokens

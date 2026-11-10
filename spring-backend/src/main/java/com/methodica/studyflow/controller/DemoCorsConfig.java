@@ -9,7 +9,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 public class DemoCorsConfig implements WebMvcConfigurer {
     @Value("${demo.allowed-origin:http://localhost:5173}") private String allowedOrigin;
     @Override public void addCorsMappings(CorsRegistry registry) {
-        registry.addMapping("/api/flows/**").allowedOrigins(allowedOrigin)
+        registry.addMapping("/api/**").allowedOrigins(allowedOrigin)
             .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS").allowPrivateNetwork(true);
     }
 }
