@@ -2,6 +2,8 @@ package com.methodica.user.entity;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.List;
 import jakarta.persistence.*;
 
 @Entity
@@ -19,6 +21,8 @@ public class User {
     private Role role;
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
+    @OneToMany(mappedBy = "user", cascade = CascadeType.REMOVE, orphanRemoval = true)
+    private List<StudySession> studySessions = new ArrayList<>();
 
     protected User() {}
     public User(String name, String email, String passwordHash, Role role) {
