@@ -23,14 +23,15 @@ class PersistenceRestartTest {
         String db = directory.resolve("classroom").toAbsolutePath().toString().replace('\\', '/');
         return new SpringApplicationBuilder(StudyFlowApplication.class)
             .web(WebApplicationType.NONE)
-            .properties("spring.datasource.url=jdbc:h2:file:" + db,
-                "spring.jpa.hibernate.ddl-auto=update")
-            .run();
+            .run("--spring.datasource.url=jdbc:h2:file:" + db,
+                "--spring.jpa.hibernate.ddl-auto=update");
     }
 
     @Test void recordsSurviveAFullApplicationRestart() {
         long flowId, typeId, blockId;
         try (ConfigurableApplicationContext app = start()) {
+            String actualUrl = app.getEnvironment().getRequiredProperty("spring.datasource.url");
+            assertEquals("jdbc:h2:file:" + directory.resolve("classroom").toAbsolutePath().toString().replace('\\', '/'), actualUrl);
             StudyFlow flow = app.getBean(StudyFlowRepository.class).save(new StudyFlow(1L, "Flow", "Description", false));
             StudyType type = app.getBean(StudyTypeRepository.class).save(new StudyType("Recall", "Description", "Retrieval", 25));
             StudyBlock block = new StudyBlock();
