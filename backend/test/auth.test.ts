@@ -446,6 +446,7 @@ test(
       // Exercise the actual bundled deployment with a database, not just health.
       const bundleScript = `
       process.env.VERCEL = "1";
+      process.env.VERCEL_ENV = "production";
       const { createServer } = await import("node:http");
       const app = (await import("./dist/vercel/index.cjs")).default;
       const server = createServer(app).listen(0, "127.0.0.1");

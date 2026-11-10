@@ -1,5 +1,7 @@
 # User Spring Boot CRUD
 
+The classroom Maven group is `com.it342g02.methodica` (IT342 G02, Methodica). This standalone User exercise retains the artifact ID `user-api`.
+
 For the website-based classroom demo on separate workstations, see [CLASSROOM-DEMO.md](../CLASSROOM-DEMO.md).
 
 This independent classroom project implements the User entity from Methodica's ERD: `userId`, `name`, `email`, `passwordHash`, `role`, and `createdAt`. The database generates the ID and the server sets the creation time. It follows the assignment's four packages:

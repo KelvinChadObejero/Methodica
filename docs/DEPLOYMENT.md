@@ -6,7 +6,7 @@ Public website: https://methodica-azure.vercel.app. A green deployment is only a
 
 Backend requires DATABASE_URL and BETTER_AUTH_SECRET. Production BETTER_AUTH_URL is the canonical public origin. Preview uses its exact VERCEL_URL/VERCEL_BRANCH_URL plus the canonical origin. Do not trust every vercel.app origin. Use separate signing secrets for production and preview. Secrets remain server-side; never add a VITE_ prefix.
 
-Neon is connected through Vercel. Preview and production currently use the same connected database. Apply only additive, compatible migrations until preview has separate storage. The backend build runs `npm run db:migrate && npm run build`: Prisma applies checked-in migrations using injected credentials, then generates the client and builds. Never run migrate reset in deployment.
+Neon is connected through Vercel. A separate empty resource `methodica-preview` was connected to Preview under the `PREVIEW_` prefix on 2026-11-10; the original resource remains connected to both environments. The local code selects only prefixed preview URLs and checks that the pooled and unpooled preview URLs refer to the same database and differ from the unprefixed production URL before migrations. These changes are not yet deployed or verified on Vercel. Existing deployments may still use the shared original database. Production builds continue to use the unprefixed connection. Never run migrate reset in deployment.
 
 ## Runtime package
 
@@ -41,3 +41,22 @@ When storage/auth is unconfigured, auth/status returns configured=false and priv
 - Legacy file: explicit local-only demo/test adapter. Never enabled on Vercel.
 
 Account timers use account-ID sessionStorage keys; device timers use their own key. See [AUTH.md](AUTH.md) for remaining email recovery, role, import and retention work.
+## OPS-01: isolation and recovery work plan
+
+Inspection on 2026-11-10: Vercel lists the same Neon integration-backed `DATABASE_URL` and unpooled migration URL for both preview and production. Separate preview and production entries exist for the authentication signing secret, but their values were not inspected. This configuration does not establish database isolation. The production deployment is marked ready; this is not a backup or restore verification.
+
+### Separate preview storage
+
+1. Inventory the current Neon resource and Vercel integration connection, including its environment targets and any existing preview-specific overrides. Record resource identifiers privately, not connection strings. Check plan limits and any cost before provisioning.
+2. The new empty preview resource supplies prefixed runtime and unpooled migration URLs. Its integration connection targets Preview only. Do not copy production accounts or private data into preview. Review credentials and fallback behavior before deployment; leave production settings untouched.
+3. Deploy a reviewed preview revision; confirm the URL check and migrations target the preview database and apply successfully. Verify the preview's database identity against production using a privileged operator's private inspection, without exposing credentials, database IDs or diagnostics publicly. A test record created in preview must appear only there; production data must remain unchanged. Confirm production health and sign-in afterward.
+4. Record the preview deployment, revision, test time and result here. Existing deployments retain their previous configuration; do not assume changing environment settings retroactively isolates them. See [Vercel environment variables](https://vercel.com/docs/environment-variables).
+
+### Recovery rehearsal
+
+1. Establish the actual provider plan, history retention window, recovery point and recovery time objectives, backup schedule, operator access and encrypted backup location. A database branch alone is not evidence of an independent backup. Confirm provider capabilities and costs before making resources.
+2. Use a disposable, isolated database containing synthetic accounts, flows, blocks, sessions and reflections. Capture a known state and time, make a controlled change, and restore the captured state to a **new isolated destination** using the selected provider recovery method. Never run the rehearsal against the production destination.
+3. Verify schema/migration state, record counts and relationships; run the authenticated two-account journey and confirm isolation. Check that restored data represents the intended point in time. Record timestamps, method, outcome and elapsed recovery time, without credentials or private user data. Destroy the disposable resources only after their identities are confirmed.
+4. Separately document and test the production incident procedure with the team: access control, maintenance mode, recovery destination, validation, cutover, communication, and handling writes after the recovery point. A deployment rollback does not undo a database migration; confirm migration compatibility before switching application revisions.
+
+The separate preview resource is connected, but the code and isolation have not yet been deployed or verified end to end; no backup/restore test has been completed. Keep OPS-01 in progress until the above evidence and its remaining security, logging and rollback acceptance criteria are satisfied.
