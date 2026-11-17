@@ -44,6 +44,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import methodica.android.theme.MethodicaTheme
 import methodica.android.model.BlockType
 import methodica.android.model.Reflection
 import methodica.android.model.StudyFlow
@@ -68,11 +69,11 @@ fun DashboardScreen(
 ) {
     val scrollState = rememberScrollState()
 
-    val totalMinutes = sessions.sumOf { it.totalMinutes }
-    val totalHours = String.format("%.1f", totalMinutes / 60.0)
+    val studySeconds = sessions.sumOf { it.focusSeconds }
+    val totalHours = String.format("%.1f", studySeconds / 3600.0)
     val avgComprehension = if (reflections.isNotEmpty()) {
         String.format("%.1f", reflections.map { it.comprehensionScore }.average())
-    } else "5.0"
+    } else "—"
 
     Column(
         modifier = Modifier
@@ -481,3 +482,40 @@ fun StatCard(
         }
     }
 }
+
+@PhonePreview
+@Composable
+private fun DashboardScreenPreview() {
+    MethodicaTheme {
+        DashboardScreen(
+            flows = listOf(ScreenPreviewData.flow),
+            activeFlow = ScreenPreviewData.flow,
+            sessions = listOf(ScreenPreviewData.session),
+            reflections = listOf(ScreenPreviewData.reflection),
+            onSelectFlow = {},
+            onStartTimer = {},
+            onNavigateToFlowBuilder = {},
+            onNavigateToHistory = {},
+            onNavigateToTechniques = {}
+        )
+    }
+}
+
+@PhonePreview
+@Composable
+private fun DashboardScreenEmptyPreview() {
+    MethodicaTheme {
+        DashboardScreen(
+            flows = emptyList(),
+            activeFlow = null,
+            sessions = emptyList(),
+            reflections = emptyList(),
+            onSelectFlow = {},
+            onStartTimer = {},
+            onNavigateToFlowBuilder = {},
+            onNavigateToHistory = {},
+            onNavigateToTechniques = {}
+        )
+    }
+}
+

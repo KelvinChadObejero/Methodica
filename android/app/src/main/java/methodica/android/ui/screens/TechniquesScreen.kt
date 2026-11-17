@@ -37,6 +37,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import methodica.android.theme.MethodicaTheme
+import methodica.android.model.SampleStudyTypes
 import methodica.android.model.BlockType
 import methodica.android.model.StudyFlow
 import methodica.android.model.StudyType
@@ -228,5 +230,17 @@ fun TechniquesScreen(
                 }
             }
         }
+    }
+}
+
+@PhonePreview
+@Composable
+private fun TechniquesScreenPreview() {
+    MethodicaTheme {
+        TechniquesScreen(
+            techniques = SampleStudyTypes.list,
+            onLoadTechnique = {},
+            onStartTechniqueTimer = {}
+        )
     }
 }

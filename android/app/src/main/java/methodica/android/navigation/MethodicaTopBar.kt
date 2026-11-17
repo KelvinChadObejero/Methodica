@@ -27,6 +27,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import methodica.android.theme.MethodicaTheme
+import methodica.android.ui.screens.PhonePreview
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -96,4 +98,15 @@ fun MethodicaTopBar(
             }
         }
     )
+}
+
+@PhonePreview
+@Composable
+private fun MethodicaTopBarPreview() {
+    MethodicaTheme {
+        MethodicaTopBar(
+            currentScreen = Screen.Dashboard,
+            onNavigate = {}
+        )
+    }
 }

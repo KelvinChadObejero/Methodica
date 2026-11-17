@@ -30,30 +30,37 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import methodica.android.theme.MethodicaTheme
+import methodica.android.model.Reflection
 import methodica.android.model.StudySession
 import methodica.android.theme.AmberStreak
 
 @Composable
 fun ReflectionScreen(
     session: StudySession?,
+    reflection: Reflection?,
+    onCancel: () -> Unit,
     onSaveReflection: (sessionId: String, comprehension: Int, fatigue: Int, notes: String) -> Unit
 ) {
+    if (session == null) {
+        TextButton(onClick = onCancel) { Text("Back to history") }
+        return
+    }
     val scrollState = rememberScrollState()
 
-    var comprehensionScore by remember { mutableStateOf(4) }
-    var fatigueScore by remember { mutableStateOf(2) }
-    var notes by remember { mutableStateOf("") }
-
-    val currentSession = session
+    var comprehensionScore by rememberSaveable(session.id) { mutableStateOf(reflection?.comprehensionScore ?: 3) }
+    var fatigueScore by rememberSaveable(session.id) { mutableStateOf(reflection?.fatigueScore ?: 3) }
+    var notes by rememberSaveable(session.id) { mutableStateOf(reflection?.notes.orEmpty()) }
 
     val comprehensionLabels = listOf(
         1 to "Confused",
@@ -95,7 +102,7 @@ fun ReflectionScreen(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "SESSION COMPLETED",
+                        text = "SESSION REFLECTION",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.Bold
@@ -105,7 +112,7 @@ fun ReflectionScreen(
                 Spacer(modifier = Modifier.height(6.dp))
 
                 Text(
-                    text = currentSession?.flowTitle ?: "Study Session Reflection",
+                    text = session.flowTitle,
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
@@ -114,7 +121,7 @@ fun ReflectionScreen(
                 Spacer(modifier = Modifier.height(4.dp))
 
                 Text(
-                    text = "${currentSession?.subject ?: "General"} · ${currentSession?.totalMinutes ?: 30} mins completed",
+                    text = "${session.subject} · ${session.durationLabel}",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -289,16 +296,13 @@ fun ReflectionScreen(
 
         // Save Action Button
         Button(
-            onClick = {
-                val sId = currentSession?.id ?: "temp-session"
-                onSaveReflection(sId, comprehensionScore, fatigueScore, notes)
-            },
+            onClick = { onSaveReflection(session.id, comprehensionScore, fatigueScore, notes) },
             shape = RoundedCornerShape(12.dp),
             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
             modifier = Modifier.fillMaxWidth()
         ) {
             Text(
-                text = "Save Reflection & Log Session",
+                text = "Save reflection",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onPrimary
@@ -306,5 +310,33 @@ fun ReflectionScreen(
             Spacer(modifier = Modifier.width(8.dp))
             Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary)
         }
+        TextButton(onClick = onCancel) { Text("Back to history") }
     }
 }
+
+@PhonePreview
+@Composable
+private fun ReflectionScreenPreview() {
+    MethodicaTheme {
+        ReflectionScreen(
+            session = ScreenPreviewData.session,
+            reflection = ScreenPreviewData.reflection,
+            onCancel = {},
+            onSaveReflection = { _, _, _, _ -> }
+        )
+    }
+}
+
+@PhonePreview
+@Composable
+private fun ReflectionScreenNewPreview() {
+    MethodicaTheme {
+        ReflectionScreen(
+            session = ScreenPreviewData.session,
+            reflection = null,
+            onCancel = {},
+            onSaveReflection = { _, _, _, _ -> }
+        )
+    }
+}
+
