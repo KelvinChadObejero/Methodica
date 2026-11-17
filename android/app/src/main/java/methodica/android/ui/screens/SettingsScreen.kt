@@ -30,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import methodica.android.theme.MethodicaTheme
 
 @Composable
 fun SettingsScreen() {
@@ -184,5 +185,13 @@ fun SettingRow(label: String, value: String) {
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
             )
         }
+    }
+}
+
+@PhonePreview
+@Composable
+private fun SettingsScreenPreview() {
+    MethodicaTheme {
+        SettingsScreen()
     }
 }

@@ -25,6 +25,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -35,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
+import methodica.android.theme.MethodicaTheme
 import methodica.android.model.Reflection
 import methodica.android.model.StudySession
 import methodica.android.theme.AmberStreak
@@ -45,7 +47,8 @@ import java.util.Locale
 @Composable
 fun HistoryScreen(
     sessions: List<StudySession>,
-    reflections: List<Reflection>
+    reflections: List<Reflection>,
+    onOpenReflection: (String) -> Unit
 ) {
     var searchQuery by remember { mutableStateOf("") }
 
@@ -183,7 +186,7 @@ fun HistoryScreen(
                         Spacer(modifier = Modifier.height(4.dp))
 
                         Text(
-                            text = "${session.totalMinutes} mins · ${session.completedBlocks} of ${session.totalBlocks} blocks completed",
+                            text = "${session.durationLabel} · ${session.completedBlocks} of ${session.totalBlocks} blocks completed",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -237,9 +240,37 @@ fun HistoryScreen(
                                 }
                             }
                         }
+                        TextButton(onClick = { onOpenReflection(session.id) }) {
+                            Text(if (reflection == null) "Add reflection" else "Edit reflection")
+                        }
                     }
                 }
             }
         }
     }
 }
+
+@PhonePreview
+@Composable
+private fun HistoryScreenPreview() {
+    MethodicaTheme {
+        HistoryScreen(
+            sessions = listOf(ScreenPreviewData.session),
+            reflections = listOf(ScreenPreviewData.reflection),
+            onOpenReflection = {}
+        )
+    }
+}
+
+@PhonePreview
+@Composable
+private fun HistoryScreenEmptyPreview() {
+    MethodicaTheme {
+        HistoryScreen(
+            sessions = emptyList(),
+            reflections = emptyList(),
+            onOpenReflection = {}
+        )
+    }
+}
+

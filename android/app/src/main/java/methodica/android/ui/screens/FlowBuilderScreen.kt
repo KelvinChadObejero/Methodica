@@ -48,6 +48,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import methodica.android.theme.MethodicaTheme
 import methodica.android.model.BlockType
 import methodica.android.model.StudyBlock
 import methodica.android.model.StudyFlow
@@ -62,8 +63,8 @@ fun FlowBuilderScreen(
     flows: List<StudyFlow>,
     activeFlow: StudyFlow?,
     onSelectFlow: (String) -> Unit,
-    onSaveFlow: (StudyFlow) -> Unit,
-    onCreateNewFlow: (String, String, String, List<StudyBlock>) -> Unit,
+    onSaveFlow: (StudyFlow) -> Boolean,
+    onCreateNewFlow: (String, String, String, List<StudyBlock>) -> StudyFlow?,
     onDeleteFlow: (String) -> Unit,
     onStartTimerWithFlow: (StudyFlow) -> Unit
 ) {
@@ -190,7 +191,8 @@ fun FlowBuilderScreen(
                             title = title.ifBlank { "Custom Flow" },
                             subject = subject.ifBlank { "General" },
                             description = description,
-                            blocks = blocks
+                            blocks = blocks,
+                            isTemplate = activeFlow?.isTemplate == true
                         )
                         if (flows.any { it.id == currentId }) {
                             onSaveFlow(updated)
@@ -215,11 +217,17 @@ fun FlowBuilderScreen(
                             title = title.ifBlank { "Custom Flow" },
                             subject = subject.ifBlank { "General" },
                             description = description,
-                            blocks = blocks
+                            blocks = blocks,
+                            isTemplate = activeFlow?.isTemplate == true
                         )
-                        onSaveFlow(updated)
-                        onStartTimerWithFlow(updated)
+                        val saved = if (activeFlow == null) {
+                            onCreateNewFlow(title, subject, description, blocks)
+                        } else {
+                            updated.takeIf(onSaveFlow)
+                        }
+                        if (saved != null) onStartTimerWithFlow(saved)
                     },
+                    enabled = blocks.isNotEmpty(),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                     modifier = Modifier.weight(1f)
@@ -436,3 +444,36 @@ fun BlockEditorCard(
         }
     }
 }
+
+@PhonePreview
+@Composable
+private fun FlowBuilderScreenPreview() {
+    MethodicaTheme {
+        FlowBuilderScreen(
+            flows = listOf(ScreenPreviewData.flow),
+            activeFlow = ScreenPreviewData.flow,
+            onSelectFlow = {},
+            onSaveFlow = { true },
+            onCreateNewFlow = { _, _, _, _ -> null },
+            onDeleteFlow = {},
+            onStartTimerWithFlow = {}
+        )
+    }
+}
+
+@PhonePreview
+@Composable
+private fun FlowBuilderScreenEmptyPreview() {
+    MethodicaTheme {
+        FlowBuilderScreen(
+            flows = emptyList(),
+            activeFlow = null,
+            onSelectFlow = {},
+            onSaveFlow = { true },
+            onCreateNewFlow = { _, _, _, _ -> null },
+            onDeleteFlow = {},
+            onStartTimerWithFlow = {}
+        )
+    }
+}
+

@@ -34,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import methodica.android.theme.MethodicaTheme
 import methodica.android.model.BlockType
 import methodica.android.model.StudyBlock
 import methodica.android.theme.ColorBreakBlock
@@ -231,5 +232,13 @@ fun CommunityScreen(
                 }
             }
         }
+    }
+}
+
+@PhonePreview
+@Composable
+private fun CommunityScreenPreview() {
+    MethodicaTheme {
+        CommunityScreen(onImportFlow = { _, _, _ -> })
     }
 }

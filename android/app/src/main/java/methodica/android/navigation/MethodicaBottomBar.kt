@@ -48,3 +48,15 @@ fun MethodicaBottomBar(
         }
     }
 }
+
+@methodica.android.ui.screens.PhonePreview
+@Composable
+private fun MethodicaBottomBarPreview() {
+    methodica.android.theme.MethodicaTheme {
+        MethodicaBottomBar(
+            currentScreen = Screen.Dashboard,
+            onScreenSelected = {}
+        )
+    }
+}
+

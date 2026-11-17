@@ -43,6 +43,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import methodica.android.theme.MethodicaTheme
 import methodica.android.model.BlockType
 import methodica.android.model.StudyFlow
 import methodica.android.theme.ColorBreakBlock
@@ -59,6 +60,8 @@ fun TimerScreen(
     elapsedStudySeconds: Int,
     elapsedBreakSeconds: Int,
     timerCompleted: Boolean,
+    timerStarted: Boolean,
+    canSaveSession: Boolean,
     onStartTimer: () -> Unit,
     onPauseTimer: () -> Unit,
     onSkipBlock: () -> Unit,
@@ -68,7 +71,7 @@ fun TimerScreen(
 
     val flow = activeFlow
     val currentBlock = flow?.blocks?.getOrNull(currentBlockIndex)
-    val totalBlockSec = (currentBlock?.durationMinutes ?: 25) * 60
+    val totalBlockSec = (currentBlock?.durationMinutes ?: 0) * 60
     val progress = if (totalBlockSec > 0) 1f - (remainingSeconds.toFloat() / totalBlockSec.toFloat()) else 0f
 
     val minutes = remainingSeconds / 60
@@ -219,7 +222,12 @@ fun TimerScreen(
                             letterSpacing = 2.sp
                         )
                         Text(
-                            text = if (isTimerRunning) "FOCUSING" else if (timerCompleted) "FINISHED" else "PAUSED",
+                            text = when {
+                                isTimerRunning -> "RUNNING"
+                                timerCompleted -> "FINISHED"
+                                timerStarted -> "PAUSED"
+                                else -> "READY"
+                            },
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
                             color = if (isTimerRunning) chipColor else MaterialTheme.colorScheme.onSurfaceVariant
@@ -237,6 +245,7 @@ fun TimerScreen(
                     // Skip Button
                     OutlinedButton(
                         onClick = onSkipBlock,
+                        enabled = timerStarted && !timerCompleted,
                         shape = CircleShape,
                         modifier = Modifier.size(54.dp)
                     ) {
@@ -246,13 +255,19 @@ fun TimerScreen(
                     // Play/Pause Main Button
                     Button(
                         onClick = { if (isTimerRunning) onPauseTimer() else onStartTimer() },
+                        enabled = flow?.blocks?.isNotEmpty() == true,
                         shape = CircleShape,
                         colors = ButtonDefaults.buttonColors(containerColor = chipColor),
                         modifier = Modifier.size(72.dp)
                     ) {
                         Icon(
                             imageVector = if (isTimerRunning) Icons.Default.Pause else Icons.Default.PlayArrow,
-                            contentDescription = if (isTimerRunning) "Pause" else "Start",
+                            contentDescription = when {
+                                isTimerRunning -> "Pause"
+                                timerCompleted -> "Start again"
+                                timerStarted -> "Resume"
+                                else -> "Start"
+                            },
                             tint = Color.White,
                             modifier = Modifier.size(36.dp)
                         )
@@ -261,6 +276,7 @@ fun TimerScreen(
                     // Stop & Reflect Button
                     OutlinedButton(
                         onClick = onFinishSession,
+                        enabled = canSaveSession && !timerCompleted,
                         shape = CircleShape,
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
                         modifier = Modifier.size(54.dp)
@@ -272,7 +288,7 @@ fun TimerScreen(
         }
 
         // Completion Banner / Next Step
-        if (timerCompleted) {
+        if (timerCompleted && canSaveSession) {
             Card(
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
@@ -290,7 +306,7 @@ fun TimerScreen(
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "Session Completed!",
+                        text = "Session ended",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
@@ -306,7 +322,7 @@ fun TimerScreen(
                         shape = RoundedCornerShape(10.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                     ) {
-                        Text("Reflect & Log Session", fontWeight = FontWeight.Bold)
+                        Text("Reflect on session", fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.width(6.dp))
                         Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null)
                     }
@@ -338,3 +354,70 @@ fun TimerScreen(
         }
     }
 }
+
+@PhonePreview
+@Composable
+private fun TimerScreenPreview() {
+    MethodicaTheme {
+        TimerScreen(
+            activeFlow = ScreenPreviewData.flow,
+            isTimerRunning = true,
+            currentBlockIndex = 0,
+            remainingSeconds = 18 * 60 + 42,
+            elapsedStudySeconds = 6 * 60 + 18,
+            elapsedBreakSeconds = 0,
+            timerCompleted = false,
+            timerStarted = true,
+            canSaveSession = true,
+            onStartTimer = {},
+            onPauseTimer = {},
+            onSkipBlock = {},
+            onFinishSession = {}
+        )
+    }
+}
+
+@PhonePreview
+@Composable
+private fun TimerScreenBreakPreview() {
+    MethodicaTheme {
+        TimerScreen(
+            activeFlow = ScreenPreviewData.flow,
+            isTimerRunning = true,
+            currentBlockIndex = 1,
+            remainingSeconds = 3 * 60 + 15,
+            elapsedStudySeconds = 25 * 60,
+            elapsedBreakSeconds = 1 * 60 + 45,
+            timerCompleted = false,
+            timerStarted = true,
+            canSaveSession = true,
+            onStartTimer = {},
+            onPauseTimer = {},
+            onSkipBlock = {},
+            onFinishSession = {}
+        )
+    }
+}
+
+@PhonePreview
+@Composable
+private fun TimerScreenCompletedPreview() {
+    MethodicaTheme {
+        TimerScreen(
+            activeFlow = ScreenPreviewData.flow,
+            isTimerRunning = false,
+            currentBlockIndex = 2,
+            remainingSeconds = 0,
+            elapsedStudySeconds = 35 * 60,
+            elapsedBreakSeconds = 5 * 60,
+            timerCompleted = true,
+            timerStarted = true,
+            canSaveSession = true,
+            onStartTimer = {},
+            onPauseTimer = {},
+            onSkipBlock = {},
+            onFinishSession = {}
+        )
+    }
+}
+
