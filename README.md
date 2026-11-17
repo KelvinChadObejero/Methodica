@@ -70,6 +70,7 @@ GitHub Actions runs those checks for both packages. API tests use a temporary fi
 ## Structure
 
 ```text
+android/              Android native app built with Jetpack Compose (Dashboard, Flow Builder, Timer, Reflections)
 frontend/             React website, styles, shared UI logic and timer tests
 backend/              Express API, accounts, Prisma migrations and integration tests
 spring-backend/       Integrated six-entity classroom CRUD backend
